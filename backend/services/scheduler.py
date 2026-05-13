@@ -99,17 +99,15 @@ def check_and_post_scheduled():
     db = SessionLocal()
     try:
         now = datetime.utcnow()
-        due = db.query(QueuedVideo).filter(
+        # Only post ONE video per tick — prevents burst-posting if multiple missed their window
+        video = db.query(QueuedVideo).filter(
             QueuedVideo.status == "scheduled",
             QueuedVideo.scheduled_at <= now,
-        ).all()
+        ).order_by(QueuedVideo.scheduled_at.asc()).first()
 
-        if due:
-            print(f"[Scheduler] {len(due)} video(s) due to post now")
-
-        for video in due:
+        if video:
+            print(f"[Scheduler] Posting video {video.id}: {video.title[:50]}")
             try:
-                print(f"[Scheduler] Posting video {video.id}: {video.title[:50]}")
                 run_pipeline(video.id, db, video.user_id)
             except Exception as e:
                 print(f"[Scheduler] Post error for video {video.id}: {e}")
