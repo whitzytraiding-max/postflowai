@@ -1,0 +1,17 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+alembic
+psycopg2-binary
+python-dotenv
+yt-dlp
+apscheduler
+httpx
+python-multipart
+supabase
+google-api-python-client
+google-auth-oauthlib
+google-auth-httplib2
+instagrapi
+google-generativeai
+groq
