@@ -31,7 +31,22 @@ app.include_router(autopilot.router)
 
 @app.on_event("startup")
 def on_startup():
+    _run_migrations()
     start_scheduler()
+
+
+def _run_migrations():
+    from sqlalchemy import text
+    migrations = [
+        "ALTER TABLE sources ADD COLUMN IF NOT EXISTS auto_approve BOOLEAN DEFAULT FALSE",
+    ]
+    with engine.connect() as conn:
+        for sql in migrations:
+            try:
+                conn.execute(text(sql))
+                conn.commit()
+            except Exception:
+                pass
 
 
 @app.get("/")
