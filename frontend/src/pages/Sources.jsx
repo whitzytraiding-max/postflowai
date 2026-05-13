@@ -74,6 +74,7 @@ export default function Sources({ userId }) {
     videos_per_day: 3,
     post_to_platform: "youtube",
     language: "any",
+    auto_approve: false,
   });
 
   useEffect(() => {
@@ -98,8 +99,11 @@ export default function Sources({ userId }) {
   }
 
   function handleFormChange(e) {
-    const { name, value, type } = e.target;
-    setForm((f) => ({ ...f, [name]: type === "number" ? Number(value) : value }));
+    const { name, value, type, checked } = e.target;
+    setForm((f) => ({
+      ...f,
+      [name]: type === "checkbox" ? checked : type === "number" ? Number(value) : value,
+    }));
   }
 
   async function handleSubmit(e) {
@@ -109,7 +113,7 @@ export default function Sources({ userId }) {
     try {
       await createSource({ ...form, user_id: userId });
       showToast("Source added!");
-      setForm({ platform: "youtube", tag: "", min_views: 50000, max_age_days: 7, videos_per_day: 3, post_to_platform: "youtube", language: "any" });
+      setForm({ platform: "youtube", tag: "", min_views: 50000, max_age_days: 7, videos_per_day: 3, post_to_platform: "youtube", language: "any", auto_approve: false });
       await loadSources();
     } catch {
       showToast("Failed to create source", "error");
@@ -240,6 +244,23 @@ export default function Sources({ userId }) {
               </select>
             </div>
           </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "20px", marginBottom: "20px" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                name="auto_approve"
+                checked={form.auto_approve}
+                onChange={handleFormChange}
+                style={{ width: "16px", height: "16px", accentColor: "#10B981", cursor: "pointer" }}
+              />
+              <span style={{ fontSize: "13px", color: COLORS.TEXT, fontWeight: 500 }}>
+                Auto-approve videos
+              </span>
+              <span style={{ fontSize: "12px", color: COLORS.MUTED }}>
+                — skip the queue, post immediately when scheduled
+              </span>
+            </label>
+          </div>
           <button
             type="submit"
             disabled={submitting}
@@ -326,6 +347,11 @@ export default function Sources({ userId }) {
                     {source.language && source.language !== "any" && (
                       <span style={{ marginLeft: "8px", background: "#7C3AED22", color: "#A78BFA", padding: "1px 8px", borderRadius: "10px", fontSize: "11px", fontWeight: 600 }}>
                         {source.language.toUpperCase()}
+                      </span>
+                    )}
+                    {source.auto_approve && (
+                      <span style={{ marginLeft: "8px", background: "#10B98122", color: "#10B981", padding: "1px 8px", borderRadius: "10px", fontSize: "11px", fontWeight: 600 }}>
+                        AUTO-APPROVE
                       </span>
                     )}
                   </div>

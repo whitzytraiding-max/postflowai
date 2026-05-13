@@ -194,6 +194,7 @@ def discover_videos_for_source(source: Source, db: Session) -> list:
         if not video_url or video_url in existing_urls:
             continue
 
+        auto_approve = getattr(source, "auto_approve", False)
         video = QueuedVideo(
             user_id=source.user_id,
             source_id=source.id,
@@ -203,7 +204,7 @@ def discover_videos_for_source(source: Source, db: Session) -> list:
             thumbnail_url=entry.get("thumbnail"),
             view_count=view_count,
             like_count=like_count,
-            status="pending",
+            status="ready" if auto_approve else "pending",
             post_to_platform=source.post_to_platform,
         )
         db.add(video)

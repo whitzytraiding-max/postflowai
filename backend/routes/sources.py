@@ -17,6 +17,7 @@ class CreateSourceBody(BaseModel):
     videos_per_day: Optional[int] = 3
     post_to_platform: str
     language: Optional[str] = "any"
+    auto_approve: Optional[bool] = False
 
 
 class UpdateSourceBody(BaseModel):
@@ -27,6 +28,7 @@ class UpdateSourceBody(BaseModel):
     post_to_platform: Optional[str] = None
     tag: Optional[str] = None
     language: Optional[str] = None
+    auto_approve: Optional[bool] = None
 
 
 @router.get("")
@@ -46,6 +48,7 @@ def create_source(body: CreateSourceBody, db: Session = Depends(get_db)):
         videos_per_day=body.videos_per_day,
         post_to_platform=body.post_to_platform,
         language=body.language or "any",
+        auto_approve=body.auto_approve or False,
     )
     db.add(source)
     db.commit()
@@ -72,6 +75,8 @@ def update_source(source_id: str, body: UpdateSourceBody, db: Session = Depends(
         source.tag = body.tag
     if body.language is not None:
         source.language = body.language
+    if body.auto_approve is not None:
+        source.auto_approve = body.auto_approve
     db.commit()
     db.refresh(source)
     return source

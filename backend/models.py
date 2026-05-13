@@ -23,6 +23,7 @@ class Source(Base):
     videos_per_day = Column(Integer, default=3)
     post_to_platform = Column(String, nullable=False)  # "instagram", "youtube", "both"
     language = Column(String, default="any")            # "any", "en", "es", "ar", etc.
+    auto_approve = Column(Boolean, default=False)       # skip manual approval, go straight to ready
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
