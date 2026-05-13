@@ -15,3 +15,4 @@ google-auth-httplib2
 instagrapi
 google-generativeai
 groq
+imageio-ffmpeg

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import api from "../lib/api";
 
 const C = {
   BG: "#0B0B18", SURFACE: "#10101C", CARD: "#14142A",
@@ -71,8 +72,8 @@ export default function Autopilot({ userId }) {
   async function load() {
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:8000/autopilot?user_id=${userId}`);
-      const data = await res.json();
+      const res = await api.get(`/autopilot?user_id=${userId}`);
+      const data = res.data;
       setSettings(data);
       setForm(f => ({
         ...f,
@@ -111,11 +112,7 @@ export default function Autopilot({ userId }) {
     else if (form.end_date) payload.end_date = form.end_date;
 
     try {
-      await fetch("http://localhost:8000/autopilot", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      await api.post("/autopilot", payload);
       showToast(payload.enabled ? "Autopilot enabled!" : "Autopilot paused");
       await load();
     } catch {
