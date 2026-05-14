@@ -16,8 +16,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN (git clone --depth=1 https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git bgutil \
     && cd bgutil/server \
     && npm install \
-    && npx tsc \
-    && echo "[POT] bgutil server built OK") \
+    && (npm run build 2>&1 || npx tsc 2>&1) \
+    && echo "[POT] bgutil server built OK" \
+    && find /app/bgutil/server -maxdepth 4 -name "server.js" 2>/dev/null) \
     || echo "[POT] bgutil build failed — service will run without PO tokens"
 
 # Copy backend source
