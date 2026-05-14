@@ -8,8 +8,8 @@ RUN apt-get update && apt-get install -y curl git \
 
 WORKDIR /app
 
-# Python deps
-COPY requirements.txt .
+# Python deps — COPY from backend/ since build context is repo root
+COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Build the bgutil PO token server (runs Botguard challenge natively in Node.js)
@@ -19,7 +19,7 @@ RUN git clone --depth=1 https://github.com/Brainicism/bgutil-ytdlp-pot-provider.
     && npm run build \
     && echo "[POT] bgutil server built OK"
 
-# Copy app source
-COPY . .
+# Copy backend source
+COPY backend/ .
 
 CMD uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}
