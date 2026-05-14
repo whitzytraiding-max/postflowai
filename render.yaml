@@ -4,7 +4,7 @@ services:
     env: python
     region: oregon
     rootDir: backend
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install -r requirements.txt && (node --version && npm --version && git clone --depth=1 https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git bgutil && cd bgutil/server && npm ci && npm run build && echo "[POT] bgutil server built OK" || echo "[POT] bgutil build failed, downloads will run without PO tokens")
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     plan: free
     envVars:

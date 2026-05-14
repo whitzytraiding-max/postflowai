@@ -8,8 +8,8 @@ from pathlib import Path
 DOWNLOAD_DIR = Path.home() / ".postflow" / "downloads"
 FFMPEG_PATH = imageio_ffmpeg.get_ffmpeg_exe()
 
-# android_vr/ios broken as of mid-2025; web + android work reliably
-CLIENTS = ["web", "android", "android_testsuite"]
+# android_vr/ios broken as of mid-2025; web first (gets PO token via bgutil), android as fallback
+CLIENTS = ["web", "mweb", "android", "android_testsuite"]
 
 
 def _get_cookie_file() -> str | None:

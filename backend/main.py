@@ -1,9 +1,34 @@
+import os
+import subprocess
+import atexit
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from database import engine, Base, get_db
 from routes import sources, queue, discovery, accounts, pipeline, settings, autopilot
 from services.scheduler import start_scheduler
+
+_pot_proc = None
+
+
+def _start_pot_server():
+    """Start the bgutil PO token server as a background subprocess."""
+    global _pot_proc
+    server_js = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "bgutil", "server", "build", "server.js")
+    )
+    if not os.path.exists(server_js):
+        print(f"[POT] bgutil server not found at {server_js} — skipping")
+        return
+    try:
+        _pot_proc = subprocess.Popen(["node", server_js])
+        atexit.register(lambda: _pot_proc.terminate() if _pot_proc else None)
+        # Tell yt-dlp-get-pot where to find the server
+        os.environ["YT_DLP_GET_POT_POT_SERVER_HOST"] = "localhost"
+        os.environ["YT_DLP_GET_POT_POT_SERVER_PORT"] = "4416"
+        print(f"[POT] bgutil token server started on port 4416 (PID {_pot_proc.pid})")
+    except Exception as e:
+        print(f"[POT] Failed to start bgutil server: {e}")
 
 # Create all DB tables on startup
 Base.metadata.create_all(bind=engine)
@@ -32,6 +57,7 @@ app.include_router(autopilot.router)
 @app.on_event("startup")
 def on_startup():
     _run_migrations()
+    _start_pot_server()
     start_scheduler()
 
 

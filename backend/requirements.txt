@@ -16,3 +16,4 @@ instagrapi
 google-generativeai
 groq
 imageio-ffmpeg
+yt-dlp-get-pot>=0.3.0
