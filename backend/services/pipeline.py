@@ -1,4 +1,6 @@
 import os
+import time
+import random
 from datetime import datetime
 from sqlalchemy.orm import Session
 from models import QueuedVideo, ConnectedAccount, PostHistory
@@ -56,7 +58,12 @@ def run_pipeline(video_id: str, db: Session, user_id: str) -> dict:
     db.commit()
 
     results = []
-    for target in targets:
+    for i, target in enumerate(targets):
+        if i > 0:
+            delay = random.randint(4, 10) * 60  # 4-10 min gap between platforms
+            print(f"[Pipeline] Waiting {delay//60}min before posting to {target}...")
+            time.sleep(delay)
+        # reuse target loop variable below
         account = db.query(ConnectedAccount).filter(
             ConnectedAccount.user_id == user_id,
             ConnectedAccount.platform == target,

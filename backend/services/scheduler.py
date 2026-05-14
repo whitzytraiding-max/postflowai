@@ -1,7 +1,10 @@
+import random
 from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 from database import SessionLocal
 from models import Source, QueuedVideo, AutopilotSettings, PostHistory
+
+MIN_POST_GAP_SECONDS = 3600  # 1 hour minimum between posts to the same platform
 
 scheduler = BackgroundScheduler()
 
@@ -83,7 +86,12 @@ def schedule_daily_posts():
 
             for i, video in enumerate(pending):
                 slot_offset = int(interval_minutes * (already_scheduled + i))
-                post_time = today_start.replace(hour=settings.start_hour) + timedelta(minutes=slot_offset)
+                variance = random.randint(-20, 20)  # ±20 min human-like drift
+                post_time = today_start.replace(hour=settings.start_hour) + timedelta(minutes=slot_offset + variance)
+                # Keep within the allowed window
+                window_start = today_start.replace(hour=settings.start_hour)
+                window_end = today_start.replace(hour=settings.end_hour)
+                post_time = max(window_start, min(post_time, window_end - timedelta(minutes=1)))
                 video.scheduled_at = post_time
                 video.status = "scheduled"
                 print(f"[Scheduler] Scheduled video {video.id} for {post_time.strftime('%H:%M')} UTC")
@@ -106,6 +114,23 @@ def check_and_post_scheduled():
         ).order_by(QueuedVideo.scheduled_at.asc()).first()
 
         if video:
+            # Enforce 1-hour minimum gap per platform
+            platforms = ["instagram", "youtube"] if video.post_to_platform == "both" else [video.post_to_platform]
+            too_soon = False
+            for platform in platforms:
+                last = db.query(PostHistory).filter(
+                    PostHistory.user_id == video.user_id,
+                    PostHistory.platform == platform,
+                    PostHistory.status == "success",
+                ).order_by(PostHistory.posted_at.desc()).first()
+                if last and (now - last.posted_at).total_seconds() < MIN_POST_GAP_SECONDS:
+                    remaining = int((MIN_POST_GAP_SECONDS - (now - last.posted_at).total_seconds()) / 60)
+                    print(f"[Scheduler] Skipping {video.id} — {platform} posted {remaining}min ago, waiting for 1h gap")
+                    too_soon = True
+                    break
+            if too_soon:
+                return
+
             print(f"[Scheduler] Posting video {video.id}: {video.title[:50]}")
             try:
                 run_pipeline(video.id, db, video.user_id)
