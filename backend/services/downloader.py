@@ -7,8 +7,8 @@ from pathlib import Path
 DOWNLOAD_DIR = Path.home() / ".postflow" / "downloads"
 FFMPEG_PATH = imageio_ffmpeg.get_ffmpeg_exe()
 
-# Try each client in order — android_vr is most reliable for Shorts
-CLIENTS = ["android_vr", "android", "ios"]
+# android_vr/ios broken as of mid-2025; web + android work reliably
+CLIENTS = ["web", "android", "android_testsuite"]
 
 
 def download_video(video_url: str, video_id: str) -> str:
@@ -24,7 +24,7 @@ def download_video(video_url: str, video_id: str) -> str:
 
         opts = {
             "outtmpl": out_path,
-            "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best",
+            "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best[ext=mp4]/best",
             "merge_output_format": "mp4",
             "ffmpeg_location": FFMPEG_PATH,
             "quiet": True,
