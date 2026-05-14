@@ -125,6 +125,112 @@ export default function Dashboard({ userId }) {
           (postedVideos.filter((v) => v.status !== "failed").length / postedVideos.length) * 100
         ) + "%";
 
+  function downloadAgent() {
+    const script = `"""
+PostFlow AI — Windows Download Agent
+Run this on your Windows PC (residential IP) to handle YouTube downloads.
+
+Install deps:  pip install yt-dlp requests
+Run:           python windows_agent.py
+"""
+
+import os
+import glob
+import time
+import tempfile
+import requests
+import yt_dlp
+
+# Config
+RENDER_URL = "https://postflow-ai-backend.onrender.com"
+USER_ID    = "dev-user-123"
+POLL_EVERY = 60   # seconds between polls
+
+
+def fetch_pending():
+    try:
+        r = requests.get(f"{RENDER_URL}/pipeline/pending-downloads",
+                         params={"user_id": USER_ID}, timeout=15)
+        return r.json() if r.ok else []
+    except Exception as e:
+        print(f"[Agent] Poll error: {e}")
+        return []
+
+
+def download_video(url, video_id, tmpdir):
+    out_path = os.path.join(tmpdir, f"{video_id}.%(ext)s")
+    opts = {
+        "outtmpl": out_path,
+        "format": "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[height<=720]",
+        "merge_output_format": "mp4",
+        "quiet": False,
+        "no_warnings": True,
+    }
+    try:
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            ydl.extract_info(url, download=True)
+        matches = glob.glob(os.path.join(tmpdir, f"{video_id}.*"))
+        if matches and os.path.getsize(matches[0]) > 0:
+            return matches[0]
+        print(f"[Agent] Download produced no file for {video_id}")
+        return None
+    except Exception as e:
+        print(f"[Agent] Download error: {e}")
+        return None
+
+
+def deliver(video_id, local_path):
+    filename = os.path.basename(local_path)
+    size_mb = os.path.getsize(local_path) / 1024 / 1024
+    print(f"[Agent] Uploading {filename} ({size_mb:.1f} MB) to Render...")
+    try:
+        with open(local_path, "rb") as f:
+            r = requests.post(
+                f"{RENDER_URL}/pipeline/{video_id}/deliver",
+                params={"user_id": USER_ID},
+                files={"file": (filename, f, "video/mp4")},
+                timeout=600,
+            )
+        if r.ok:
+            print(f"[Agent] Delivered {video_id}: {r.json()}")
+            return True
+        else:
+            print(f"[Agent] Deliver failed {r.status_code}: {r.text}")
+            return False
+    except Exception as e:
+        print(f"[Agent] Upload error: {e}")
+        return False
+
+
+def main():
+    print(f"[Agent] PostFlow Windows agent started. Polling every {POLL_EVERY}s...")
+    while True:
+        videos = fetch_pending()
+        if videos:
+            print(f"[Agent] {len(videos)} video(s) to download")
+            for v in videos:
+                print(f"[Agent] Downloading: {v['title']} ({v['id']})")
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    path = download_video(v["original_url"], v["id"], tmpdir)
+                    if path:
+                        deliver(v["id"], path)
+        else:
+            print(f"[Agent] Nothing pending. Next check in {POLL_EVERY}s...")
+        time.sleep(POLL_EVERY)
+
+
+if __name__ == "__main__":
+    main()
+`;
+    const blob = new Blob([script], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "windows_agent.py";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   const recentQueue = [...queue]
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
     .slice(0, 5);
@@ -242,6 +348,49 @@ export default function Dashboard({ userId }) {
             </tbody>
           </table>
         )}
+      </div>
+
+      {/* Windows Agent download */}
+      <div
+        style={{
+          background: COLORS.CARD,
+          borderRadius: "12px",
+          padding: "20px",
+          border: "1px solid #1E1E35",
+          marginTop: "24px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "16px",
+          flexWrap: "wrap",
+        }}
+      >
+        <div>
+          <div style={{ fontWeight: 700, color: COLORS.TEXT, fontSize: "15px", marginBottom: "4px" }}>
+            Windows Download Agent
+          </div>
+          <div style={{ color: COLORS.MUTED, fontSize: "13px" }}>
+            Run on your Windows PC to handle YouTube downloads from a residential IP.
+            Install: <code style={{ color: COLORS.PRIMARY }}>pip install yt-dlp requests</code>
+          </div>
+        </div>
+        <button
+          onClick={downloadAgent}
+          style={{
+            background: COLORS.SECONDARY,
+            color: "#fff",
+            border: "none",
+            borderRadius: "8px",
+            padding: "10px 20px",
+            fontWeight: 700,
+            fontSize: "13px",
+            cursor: "pointer",
+            whiteSpace: "nowrap",
+            flexShrink: 0,
+          }}
+        >
+          Download windows_agent.py
+        </button>
       </div>
 
       {toast && <Toast msg={toast.msg} type={toast.type} />}
