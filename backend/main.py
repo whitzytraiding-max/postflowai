@@ -15,7 +15,7 @@ def _start_pot_server():
     """Start the bgutil PO token server as a background subprocess."""
     global _pot_proc
     server_js = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "bgutil", "server", "build", "server.js")
+        os.path.join(os.path.dirname(__file__), "bgutil", "server", "build", "main.js")
     )
     if not os.path.exists(server_js):
         print(f"[POT] bgutil server not found at {server_js} — skipping")

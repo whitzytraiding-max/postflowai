@@ -1,25 +1,23 @@
 FROM python:3.11-slim
 
-# Install Node.js 20 + git + curl
-RUN apt-get update && apt-get install -y curl git \
+# Install Node.js 20 + canvas runtime libs
+RUN apt-get update && apt-get install -y curl \
+    libcairo2 libpango-1.0-0 libpangocairo-1.0-0 \
+    libjpeg62-turbo libgif7 librsvg2-2 \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Python deps — COPY from backend/ since build context is repo root
+# Python deps
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Build the bgutil PO token server — optional, service starts even if this fails
-RUN (git clone --depth=1 https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git bgutil \
-    && cd bgutil/server \
-    && npm install \
-    && (npm run build 2>&1 || npx tsc 2>&1) \
-    && echo "[POT] bgutil server built OK" \
-    && find /app/bgutil/server -maxdepth 4 -name "server.js" 2>/dev/null) \
-    || echo "[POT] bgutil build failed — service will run without PO tokens"
+# bgutil PO token server — pre-built JS committed to repo, just install runtime deps
+COPY backend/bgutil_server /app/bgutil/server
+RUN cd /app/bgutil/server && npm ci --omit=dev --no-audit --no-fund \
+    && echo "[POT] bgutil node_modules installed OK"
 
 # Copy backend source
 COPY backend/ .
