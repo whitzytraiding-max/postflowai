@@ -3,7 +3,7 @@ services:
     name: postflow-ai-backend
     env: docker
     region: oregon
-    dockerfilePath: ./backend/Dockerfile
+    dockerfilePath: ./Dockerfile
     plan: free
     envVars:
       - key: DATABASE_URL
