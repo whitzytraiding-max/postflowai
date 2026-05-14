@@ -13,17 +13,20 @@ CLIENTS = ["web", "android", "android_testsuite"]
 
 
 def _get_cookie_file() -> str | None:
-    """Return path to YouTube cookies file (Render secret file or env var fallback)."""
-    # Render Secret File takes priority
+    """Return path to YouTube cookies file (Render secret file or base64 env var fallback)."""
     secret_path = "/etc/secrets/youtube_cookies.txt"
     if os.path.exists(secret_path):
         return secret_path
-    # Fallback: env var written to a temp file
-    cookies = os.environ.get("YOUTUBE_COOKIES", "").strip()
-    if not cookies:
+    raw = os.environ.get("YOUTUBE_COOKIES", "").strip()
+    if not raw:
         return None
+    import base64
+    try:
+        content = base64.b64decode(raw).decode("utf-8")
+    except Exception:
+        content = raw  # assume it's already plaintext
     tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False)
-    tmp.write(cookies)
+    tmp.write(content)
     tmp.close()
     return tmp.name
 
