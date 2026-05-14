@@ -61,7 +61,7 @@ const labelStyle = {
   letterSpacing: "0.04em",
 };
 
-export default function Sources({ userId }) {
+export default function Sources() {
   const [sources, setSources] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
@@ -84,7 +84,7 @@ export default function Sources({ userId }) {
   async function loadSources() {
     setLoading(true);
     try {
-      const data = await getSources(userId);
+      const data = await getSources();
       setSources(data);
     } catch {
       showToast("Failed to load sources", "error");
@@ -111,7 +111,7 @@ export default function Sources({ userId }) {
     if (!form.tag.trim()) return showToast("Tag is required", "error");
     setSubmitting(true);
     try {
-      await createSource({ ...form, user_id: userId });
+      await createSource(form);
       showToast("Source added!");
       setForm({ platform: "youtube", tag: "", min_views: 50000, max_age_days: 7, videos_per_day: 3, post_to_platform: "youtube", language: "any", auto_approve: false });
       await loadSources();

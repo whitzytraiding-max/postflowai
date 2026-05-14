@@ -17,3 +17,5 @@ google-generativeai
 groq
 imageio-ffmpeg
 yt-dlp-get-pot>=0.3.0
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4

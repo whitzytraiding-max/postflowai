@@ -51,7 +51,7 @@ const HOURS = Array.from({ length: 24 }, (_, i) => {
   return { value: i, label: `${h}:00 ${ampm}` };
 });
 
-export default function Autopilot({ userId }) {
+export default function Autopilot() {
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -72,7 +72,7 @@ export default function Autopilot({ userId }) {
   async function load() {
     setLoading(true);
     try {
-      const res = await api.get(`/autopilot?user_id=${userId}`);
+      const res = await api.get("/autopilot");
       const data = res.data;
       setSettings(data);
       setForm(f => ({
@@ -102,7 +102,6 @@ export default function Autopilot({ userId }) {
   async function handleSave(enabledOverride) {
     setSaving(true);
     const payload = {
-      user_id: userId,
       enabled: enabledOverride !== undefined ? enabledOverride : form.enabled,
       posts_per_day: form.posts_per_day,
       start_hour: form.start_hour,

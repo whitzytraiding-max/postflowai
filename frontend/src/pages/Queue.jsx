@@ -72,7 +72,7 @@ function Toast({ msg, type }) {
   );
 }
 
-export default function Queue({ userId }) {
+export default function Queue() {
   const [videos, setVideos] = useState([]);
   const [activeTab, setActiveTab] = useState("all");
   const [loading, setLoading] = useState(true);
@@ -100,7 +100,7 @@ export default function Queue({ userId }) {
 
   async function loadQueue() {
     try {
-      const data = await getQueue(userId);
+      const data = await getQueue();
       setVideos(data);
     } catch {
       // Silently fail on poll, show error only on first load
@@ -132,7 +132,7 @@ export default function Queue({ userId }) {
       prev.map((v) => (v.id === id ? { ...v, status: "downloading" } : v))
     );
     try {
-      await runPipeline(id, userId);
+      await runPipeline(id);
       showToast("Pipeline started — video is downloading");
     } catch {
       showToast("Failed to start pipeline", "error");
@@ -154,7 +154,7 @@ export default function Queue({ userId }) {
       prev.map((v) => (v.id === id ? { ...v, status: "downloading", error_msg: null } : v))
     );
     try {
-      await retryVideo(id, userId);
+      await retryVideo(id);
       showToast("Retrying — video is downloading");
     } catch {
       showToast("Retry failed", "error");

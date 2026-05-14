@@ -4,7 +4,8 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 from database import get_db
-from models import QueuedVideo
+from models import QueuedVideo, User
+from services.auth import get_current_user
 
 router = APIRouter(prefix="/queue", tags=["queue"])
 
@@ -16,16 +17,16 @@ class UpdateQueueBody(BaseModel):
 
 
 @router.get("")
-def list_queue(user_id: str, status: Optional[str] = None, db: Session = Depends(get_db)):
-    query = db.query(QueuedVideo).filter(QueuedVideo.user_id == user_id)
+def list_queue(current_user: User = Depends(get_current_user), status: Optional[str] = None, db: Session = Depends(get_db)):
+    query = db.query(QueuedVideo).filter(QueuedVideo.user_id == current_user.id)
     if status:
         query = query.filter(QueuedVideo.status == status)
     return query.order_by(QueuedVideo.created_at.desc()).all()
 
 
 @router.patch("/{video_id}")
-def update_queue_item(video_id: str, body: UpdateQueueBody, db: Session = Depends(get_db)):
-    video = db.query(QueuedVideo).filter(QueuedVideo.id == video_id).first()
+def update_queue_item(video_id: str, body: UpdateQueueBody, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    video = db.query(QueuedVideo).filter(QueuedVideo.id == video_id, QueuedVideo.user_id == current_user.id).first()
     if not video:
         raise HTTPException(status_code=404, detail="Video not found")
     if body.status is not None:
@@ -40,8 +41,8 @@ def update_queue_item(video_id: str, body: UpdateQueueBody, db: Session = Depend
 
 
 @router.delete("/{video_id}")
-def delete_queue_item(video_id: str, db: Session = Depends(get_db)):
-    video = db.query(QueuedVideo).filter(QueuedVideo.id == video_id).first()
+def delete_queue_item(video_id: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    video = db.query(QueuedVideo).filter(QueuedVideo.id == video_id, QueuedVideo.user_id == current_user.id).first()
     if not video:
         raise HTTPException(status_code=404, detail="Video not found")
     db.delete(video)
@@ -50,8 +51,8 @@ def delete_queue_item(video_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/{video_id}/approve")
-def approve_video(video_id: str, db: Session = Depends(get_db)):
-    video = db.query(QueuedVideo).filter(QueuedVideo.id == video_id).first()
+def approve_video(video_id: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    video = db.query(QueuedVideo).filter(QueuedVideo.id == video_id, QueuedVideo.user_id == current_user.id).first()
     if not video:
         raise HTTPException(status_code=404, detail="Video not found")
     video.status = "ready"

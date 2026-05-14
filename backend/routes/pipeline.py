@@ -3,6 +3,8 @@ import shutil
 from fastapi import APIRouter, Depends, BackgroundTasks, UploadFile, File
 from sqlalchemy.orm import Session
 from database import get_db
+from models import User
+from services.auth import get_current_user
 from services.pipeline import run_pipeline
 from pathlib import Path
 
@@ -12,21 +14,14 @@ DOWNLOAD_DIR = Path.home() / ".postflow" / "downloads"
 
 
 @router.post("/{video_id}/run")
-def run_video_pipeline(
-    video_id: str,
-    user_id: str,
-    background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db),
-):
-    """Trigger download -> caption -> post for a queued video."""
+def run_video_pipeline(video_id: str, background_tasks: BackgroundTasks, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     from models import QueuedVideo
-    video = db.query(QueuedVideo).filter(QueuedVideo.id == video_id).first()
+    video = db.query(QueuedVideo).filter(QueuedVideo.id == video_id, QueuedVideo.user_id == current_user.id).first()
     if not video:
         return {"error": "Not found"}
     video.status = "downloading"
     db.commit()
-
-    background_tasks.add_task(run_pipeline_bg, video_id, user_id)
+    background_tasks.add_task(run_pipeline_bg, video_id, current_user.id)
     return {"status": "started", "video_id": video_id}
 
 
@@ -40,54 +35,33 @@ def run_pipeline_bg(video_id: str, user_id: str):
 
 
 @router.post("/{video_id}/retry")
-def retry_video_pipeline(
-    video_id: str,
-    user_id: str,
-    background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db),
-):
-    """Reset a failed video to pending and re-run the pipeline."""
+def retry_video_pipeline(video_id: str, background_tasks: BackgroundTasks, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     from models import QueuedVideo
-    video = db.query(QueuedVideo).filter(QueuedVideo.id == video_id).first()
+    video = db.query(QueuedVideo).filter(QueuedVideo.id == video_id, QueuedVideo.user_id == current_user.id).first()
     if not video:
         return {"error": "Not found"}
     video.status = "downloading"
     video.error_msg = None
     db.commit()
-
-    background_tasks.add_task(run_pipeline_bg, video_id, user_id)
+    background_tasks.add_task(run_pipeline_bg, video_id, current_user.id)
     return {"status": "retrying", "video_id": video_id}
 
 
 @router.get("/pending-downloads")
-def get_pending_downloads(user_id: str, db: Session = Depends(get_db)):
-    """Windows agent polls this for videos that need downloading."""
+def get_pending_downloads(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     from models import QueuedVideo
     videos = db.query(QueuedVideo).filter(
-        QueuedVideo.user_id == user_id,
+        QueuedVideo.user_id == current_user.id,
         QueuedVideo.status.in_(["pending", "scheduled"]),
         QueuedVideo.local_path == None,
     ).limit(2).all()
-    return [
-        {"id": v.id, "original_url": v.original_url, "title": v.title, "status": v.status}
-        for v in videos
-    ]
+    return [{"id": v.id, "original_url": v.original_url, "title": v.title, "status": v.status} for v in videos]
 
 
 @router.post("/{video_id}/deliver")
-async def deliver_video(
-    video_id: str,
-    user_id: str,
-    background_tasks: BackgroundTasks,
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-):
-    """
-    Windows agent uploads the downloaded video file here.
-    Render stores it and runs caption + post in the background.
-    """
+async def deliver_video(video_id: str, background_tasks: BackgroundTasks, file: UploadFile = File(...), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     from models import QueuedVideo
-    video = db.query(QueuedVideo).filter(QueuedVideo.id == video_id).first()
+    video = db.query(QueuedVideo).filter(QueuedVideo.id == video_id, QueuedVideo.user_id == current_user.id).first()
     if not video:
         return {"error": "Not found"}
 
@@ -100,10 +74,9 @@ async def deliver_video(
 
     video.local_path = str(dest)
     video.error_msg = None
-    # Keep scheduled videos on their schedule; reset others to ready for the scheduler to pick up
     if video.status not in ("scheduled",):
         video.status = "ready"
     db.commit()
 
     print(f"[Deliver] Received {dest} ({dest.stat().st_size // 1024}KB) for video {video_id} — status={video.status}")
-    return {"status": "received", "video_id": video_id, "path": str(dest)}
+    return {"status": "received", "video_id": video_id}

@@ -140,7 +140,7 @@ function Badge({ label, color }) {
   );
 }
 
-export default function Settings({ userId }) {
+export default function Settings() {
   const [toast, setToast] = useState(null);
 
   // AI Keys state
@@ -173,14 +173,14 @@ export default function Settings({ userId }) {
 
   useEffect(() => {
     loadAll();
-  }, [userId]);
+  }, []);
 
   async function loadAll() {
     setLoadingAccounts(true);
     try {
       const [keys, accs] = await Promise.all([
-        getSettings(userId).catch(() => ({})),
-        getConnectedAccounts(userId).catch(() => []),
+        getSettings().catch(() => ({})),
+        getConnectedAccounts().catch(() => []),
       ]);
       setGeminiSet(keys.gemini_set || false);
       setGroqSet(keys.groq_set || false);
@@ -196,7 +196,6 @@ export default function Settings({ userId }) {
     setSavingKeys(true);
     try {
       await saveKeys({
-        user_id: userId,
         gemini_api_key: geminiKey || undefined,
         groq_api_key: groqKey || undefined,
       });
@@ -204,7 +203,7 @@ export default function Settings({ userId }) {
       setGeminiKey("");
       setGroqKey("");
       // Refresh set status
-      const keys = await getSettings(userId).catch(() => ({}));
+      const keys = await getSettings().catch(() => ({}));
       setGeminiSet(keys.gemini_set || false);
       setGroqSet(keys.groq_set || false);
     } catch {
@@ -222,7 +221,6 @@ export default function Settings({ userId }) {
     setConnectingIg(true);
     try {
       await connectInstagram({
-        user_id: userId,
         session_id: igSessionId,
         account_name: igAccountName,
       });
@@ -245,7 +243,6 @@ export default function Settings({ userId }) {
     setConnectingYt(true);
     try {
       await connectYouTube({
-        user_id: userId,
         account_name: ytAccountName,
         client_id: ytClientId,
         client_secret: ytClientSecret,

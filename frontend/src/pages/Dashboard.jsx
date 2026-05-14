@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getSources, getQueue, runDiscovery } from "../lib/api";
+import { useAuth } from "../lib/AuthContext";
 
 const COLORS = {
   BG: "#0B0B18",
@@ -73,7 +74,8 @@ function Toast({ msg, type }) {
   );
 }
 
-export default function Dashboard({ userId }) {
+export default function Dashboard() {
+  const { user, logout } = useAuth();
   const [sources, setSources] = useState([]);
   const [queue, setQueue] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -81,7 +83,7 @@ export default function Dashboard({ userId }) {
   const [toast, setToast] = useState(null);
 
   useEffect(() => {
-    Promise.all([getSources(userId), getQueue(userId)])
+    Promise.all([getSources(), getQueue()])
       .then(([s, q]) => {
         setSources(s);
         setQueue(q);
@@ -98,7 +100,7 @@ export default function Dashboard({ userId }) {
   async function handleRunDiscovery() {
     setDiscovering(true);
     try {
-      const result = await runDiscovery(userId);
+      const result = await runDiscovery();
       showToast(`Discovery complete! Found ${result.discovered} new video(s).`);
       const q = await getQueue(userId);
       setQueue(q);
@@ -126,6 +128,7 @@ export default function Dashboard({ userId }) {
         ) + "%";
 
   function downloadAgent() {
+    const apiKey = user?.api_key || "";
     const script = `"""
 PostFlow AI — Windows Download Agent
 Run this on your Windows PC (residential IP) to handle YouTube downloads.
@@ -143,14 +146,15 @@ import yt_dlp
 
 # Config
 RENDER_URL = "https://postflow-ai-backend.onrender.com"
-USER_ID    = "dev-user-123"
+API_KEY    = "${apiKey}"
+HEADERS    = {"X-API-Key": API_KEY}
 POLL_EVERY = 60   # seconds between polls
 
 
 def fetch_pending():
     try:
         r = requests.get(f"{RENDER_URL}/pipeline/pending-downloads",
-                         params={"user_id": USER_ID}, timeout=15)
+                         headers=HEADERS, timeout=15)
         return r.json() if r.ok else []
     except Exception as e:
         print(f"[Agent] Poll error: {e}")
@@ -187,7 +191,7 @@ def deliver(video_id, local_path):
         with open(local_path, "rb") as f:
             r = requests.post(
                 f"{RENDER_URL}/pipeline/{video_id}/deliver",
-                params={"user_id": USER_ID},
+                headers=HEADERS,
                 files={"file": (filename, f, "video/mp4")},
                 timeout=600,
             )
@@ -245,11 +249,16 @@ if __name__ == "__main__":
 
   return (
     <div>
-      <div style={{ marginBottom: "28px" }}>
-        <h1 style={{ fontSize: "24px", fontWeight: 700, color: COLORS.TEXT }}>Dashboard</h1>
-        <p style={{ color: COLORS.MUTED, marginTop: "4px", fontSize: "14px" }}>
-          Your PostFlow AI overview
-        </p>
+      <div style={{ marginBottom: "28px", display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+        <div>
+          <h1 style={{ fontSize: "24px", fontWeight: 700, color: COLORS.TEXT }}>Dashboard</h1>
+          <p style={{ color: COLORS.MUTED, marginTop: "4px", fontSize: "14px" }}>
+            {user?.email} — PostFlow AI
+          </p>
+        </div>
+        <button onClick={logout} style={{ background: "transparent", border: `1px solid ${COLORS.MUTED}`, color: COLORS.MUTED, borderRadius: "8px", padding: "8px 16px", fontSize: "13px", cursor: "pointer" }}>
+          Sign Out
+        </button>
       </div>
 
       {/* Stat cards */}

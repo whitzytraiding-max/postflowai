@@ -16,16 +16,16 @@ const PLATFORM_ICONS = {
   tiktok: "🎵",
 };
 
-export default function History({ userId }) {
+export default function History() {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getHistory(userId)
+    getHistory()
       .then(setHistory)
       .catch(() => setHistory([]))
       .finally(() => setLoading(false));
-  }, [userId]);
+  }, []);
 
   return (
     <div>

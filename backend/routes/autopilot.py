@@ -4,47 +4,40 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime, timedelta
 from database import get_db
-from models import AutopilotSettings, QueuedVideo, PostHistory
+from models import AutopilotSettings, QueuedVideo, PostHistory, User
+from services.auth import get_current_user
 
 router = APIRouter(prefix="/autopilot", tags=["autopilot"])
 
 
 class SaveAutopilotBody(BaseModel):
-    user_id: str
     enabled: bool
     posts_per_day: Optional[int] = 5
     start_hour: Optional[int] = 8
     end_hour: Optional[int] = 22
-    days: Optional[int] = None        # run for X days from now
-    end_date: Optional[str] = None    # ISO date string, alternative to days
+    days: Optional[int] = None
+    end_date: Optional[str] = None
 
 
 @router.get("")
-def get_autopilot(user_id: str, db: Session = Depends(get_db)):
-    settings = db.query(AutopilotSettings).filter(AutopilotSettings.user_id == user_id).first()
+def get_autopilot(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    settings = db.query(AutopilotSettings).filter(AutopilotSettings.user_id == current_user.id).first()
     if not settings:
-        return {
-            "enabled": False,
-            "posts_per_day": 5,
-            "start_hour": 8,
-            "end_hour": 22,
-            "end_date": None,
-        }
+        return {"enabled": False, "posts_per_day": 5, "start_hour": 8, "end_hour": 22, "end_date": None}
 
-    # Today's stats
     now = datetime.utcnow()
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     today_end = today_start + timedelta(days=1)
 
     posted_today = db.query(PostHistory).filter(
-        PostHistory.user_id == user_id,
+        PostHistory.user_id == current_user.id,
         PostHistory.status == "success",
         PostHistory.posted_at >= today_start,
         PostHistory.posted_at < today_end,
     ).count()
 
     scheduled_today = db.query(QueuedVideo).filter(
-        QueuedVideo.user_id == user_id,
+        QueuedVideo.user_id == current_user.id,
         QueuedVideo.status == "scheduled",
         QueuedVideo.scheduled_at >= today_start,
         QueuedVideo.scheduled_at < today_end,
@@ -57,7 +50,7 @@ def get_autopilot(user_id: str, db: Session = Depends(get_db)):
             break
 
     pending_count = db.query(QueuedVideo).filter(
-        QueuedVideo.user_id == user_id,
+        QueuedVideo.user_id == current_user.id,
         QueuedVideo.status == "pending",
     ).count()
 
@@ -75,8 +68,8 @@ def get_autopilot(user_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("")
-def save_autopilot(body: SaveAutopilotBody, db: Session = Depends(get_db)):
-    settings = db.query(AutopilotSettings).filter(AutopilotSettings.user_id == body.user_id).first()
+def save_autopilot(body: SaveAutopilotBody, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    settings = db.query(AutopilotSettings).filter(AutopilotSettings.user_id == current_user.id).first()
 
     end_date = None
     if body.days:
@@ -93,7 +86,7 @@ def save_autopilot(body: SaveAutopilotBody, db: Session = Depends(get_db)):
         settings.updated_at = datetime.utcnow()
     else:
         settings = AutopilotSettings(
-            user_id=body.user_id,
+            user_id=current_user.id,
             enabled=body.enabled,
             posts_per_day=body.posts_per_day or 5,
             start_hour=body.start_hour if body.start_hour is not None else 8,
@@ -104,7 +97,6 @@ def save_autopilot(body: SaveAutopilotBody, db: Session = Depends(get_db)):
 
     db.commit()
 
-    # If just enabled, schedule today's posts immediately (don't wait for midnight)
     if body.enabled:
         from services.scheduler import schedule_daily_posts
         import threading
@@ -114,9 +106,8 @@ def save_autopilot(body: SaveAutopilotBody, db: Session = Depends(get_db)):
 
 
 @router.post("/trigger")
-def trigger_now(user_id: str, db: Session = Depends(get_db)):
-    """Manually trigger today's scheduling immediately."""
-    from services.scheduler import schedule_daily_posts, check_and_post_scheduled
+def trigger_now(current_user: User = Depends(get_current_user)):
+    from services.scheduler import schedule_daily_posts
     import threading
     threading.Thread(target=schedule_daily_posts, daemon=True).start()
-    return {"ok": True, "message": "Scheduling triggered"}
+    return {"ok": True}

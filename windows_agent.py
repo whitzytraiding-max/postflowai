@@ -15,7 +15,8 @@ import yt_dlp
 
 # ── Config ──────────────────────────────────────────────────────────────────
 RENDER_URL = "https://postflow-ai-backend.onrender.com"
-USER_ID    = "dev-user-123"
+API_KEY    = "YOUR_API_KEY_HERE"   # get this from the PostFlow dashboard
+HEADERS    = {"X-API-Key": API_KEY}
 POLL_EVERY = 60   # seconds between polls
 # ────────────────────────────────────────────────────────────────────────────
 
@@ -23,7 +24,7 @@ POLL_EVERY = 60   # seconds between polls
 def fetch_pending():
     try:
         r = requests.get(f"{RENDER_URL}/pipeline/pending-downloads",
-                         params={"user_id": USER_ID}, timeout=15)
+                         headers=HEADERS, timeout=15)
         return r.json() if r.ok else []
     except Exception as e:
         print(f"[Agent] Poll error: {e}")
@@ -60,7 +61,7 @@ def deliver(video_id: str, local_path: str) -> bool:
         with open(local_path, "rb") as f:
             r = requests.post(
                 f"{RENDER_URL}/pipeline/{video_id}/deliver",
-                params={"user_id": USER_ID},
+                headers=HEADERS,
                 files={"file": (filename, f, "video/mp4")},
                 timeout=600,
             )

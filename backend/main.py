@@ -6,13 +6,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from database import engine, Base, get_db
 from routes import sources, queue, discovery, accounts, pipeline, settings, autopilot
+from routes.auth import router as auth_router
 from services.scheduler import start_scheduler
 
 _pot_proc = None
 
 
 def _start_pot_server():
-    """Start the bgutil PO token server as a background subprocess."""
     global _pot_proc
     server_js = os.path.abspath(
         os.path.join(os.path.dirname(__file__), "bgutil", "server", "build", "main.js")
@@ -23,19 +23,17 @@ def _start_pot_server():
     try:
         _pot_proc = subprocess.Popen(["node", server_js])
         atexit.register(lambda: _pot_proc.terminate() if _pot_proc else None)
-        # Tell yt-dlp-get-pot where to find the server
         os.environ["YT_DLP_GET_POT_POT_SERVER_HOST"] = "localhost"
         os.environ["YT_DLP_GET_POT_POT_SERVER_PORT"] = "4416"
         print(f"[POT] bgutil token server started on port 4416 (PID {_pot_proc.pid})")
     except Exception as e:
         print(f"[POT] Failed to start bgutil server: {e}")
 
-# Create all DB tables on startup
+
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="PostFlow AI", version="1.0.0")
+app = FastAPI(title="PostFlow AI", version="2.0.0")
 
-# CORS — allow all origins for dev
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -44,7 +42,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
+app.include_router(auth_router)
 app.include_router(sources.router)
 app.include_router(queue.router)
 app.include_router(discovery.router)
