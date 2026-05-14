@@ -13,11 +13,11 @@ COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Build the bgutil PO token server — optional, service starts even if this fails
-RUN git clone --depth=1 https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git bgutil \
+RUN (git clone --depth=1 https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git bgutil \
     && cd bgutil/server \
     && npm install \
-    && npm run build \
-    && echo "[POT] bgutil server built OK" \
+    && npx tsc \
+    && echo "[POT] bgutil server built OK") \
     || echo "[POT] bgutil build failed — service will run without PO tokens"
 
 # Copy backend source
