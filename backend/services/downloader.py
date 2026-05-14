@@ -16,18 +16,25 @@ def _get_cookie_file() -> str | None:
     """Return path to YouTube cookies file (Render secret file or base64 env var fallback)."""
     secret_path = "/etc/secrets/youtube_cookies.txt"
     if os.path.exists(secret_path):
+        size = os.path.getsize(secret_path)
+        print(f"[Downloader] Using secret file cookies: {secret_path} ({size} bytes)")
         return secret_path
     raw = os.environ.get("YOUTUBE_COOKIES", "").strip()
     if not raw:
+        print("[Downloader] No YOUTUBE_COOKIES env var — downloading without cookies")
         return None
+    print(f"[Downloader] YOUTUBE_COOKIES env var found ({len(raw)} chars), decoding...")
     import base64
     try:
         content = base64.b64decode(raw).decode("utf-8")
-    except Exception:
-        content = raw  # assume it's already plaintext
+        print(f"[Downloader] Base64 decoded OK — {len(content)} chars, {content.count(chr(10))} lines")
+    except Exception as e:
+        print(f"[Downloader] Base64 decode failed ({e}), using as plaintext")
+        content = raw
     tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False)
     tmp.write(content)
     tmp.close()
+    print(f"[Downloader] Cookie file written to {tmp.name}")
     return tmp.name
 
 
