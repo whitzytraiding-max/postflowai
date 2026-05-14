@@ -57,6 +57,9 @@ export const deleteAccount = (id) =>
 export const runPipeline = (videoId, userId) =>
   api.post(`/pipeline/${videoId}/run?user_id=${userId}`).then((r) => r.data);
 
+export const retryVideo = (videoId, userId) =>
+  api.post(`/pipeline/${videoId}/retry?user_id=${userId}`).then((r) => r.data);
+
 // Settings
 export const getSettings = (userId) =>
   api.get(`/settings/keys?user_id=${userId}`).then((r) => r.data);

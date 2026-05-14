@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { getQueue, approveVideo, deleteFromQueue, runPipeline } from "../lib/api";
+import { getQueue, approveVideo, deleteFromQueue, runPipeline, retryVideo } from "../lib/api";
 
 const COLORS = {
   CARD: "#14142A",
@@ -138,6 +138,28 @@ export default function Queue({ userId }) {
       showToast("Failed to start pipeline", "error");
       setVideos((prev) =>
         prev.map((v) => (v.id === id ? { ...v, status: "pending" } : v))
+      );
+    } finally {
+      setPostingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
+  }
+
+  async function handleRetry(id) {
+    setPostingIds((prev) => new Set([...prev, id]));
+    setVideos((prev) =>
+      prev.map((v) => (v.id === id ? { ...v, status: "downloading", error_msg: null } : v))
+    );
+    try {
+      await retryVideo(id, userId);
+      showToast("Retrying — video is downloading");
+    } catch {
+      showToast("Retry failed", "error");
+      setVideos((prev) =>
+        prev.map((v) => (v.id === id ? { ...v, status: "failed" } : v))
       );
     } finally {
       setPostingIds((prev) => {
@@ -383,6 +405,28 @@ export default function Queue({ userId }) {
                       }}
                     >
                       {isPosting ? "Starting..." : "Post Now"}
+                    </button>
+                  )}
+
+                  {/* Retry button — failed only */}
+                  {v.status === "failed" && (
+                    <button
+                      onClick={() => handleRetry(v.id)}
+                      disabled={postingIds.has(v.id)}
+                      title="Retry download and post"
+                      style={{
+                        background: COLORS.ORANGE + "22",
+                        color: COLORS.ORANGE,
+                        border: `1px solid ${COLORS.ORANGE}`,
+                        borderRadius: "6px",
+                        padding: "5px 10px",
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        cursor: postingIds.has(v.id) ? "not-allowed" : "pointer",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      Retry
                     </button>
                   )}
 
