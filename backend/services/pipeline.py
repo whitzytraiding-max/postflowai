@@ -18,19 +18,25 @@ def run_pipeline(video_id: str, db: Session, user_id: str) -> dict:
     platform = video.post_to_platform  # "youtube", "instagram", or "both"
     targets = ["youtube", "instagram"] if platform == "both" else [platform]
 
-    # 1. Download
-    video.status = "downloading"
-    db.commit()
-    try:
-        local_path = download_video(video.original_url, video.id)
-        video.local_path = local_path
+    # 1. Download (skip if already delivered by Windows agent)
+    if video.local_path and os.path.exists(video.local_path):
+        print(f"[Pipeline] Using pre-delivered file: {video.local_path}")
+        local_path = video.local_path
         video.status = "ready"
         db.commit()
-    except Exception as e:
-        video.status = "failed"
-        video.error_msg = f"Download failed: {e}"
+    else:
+        video.status = "downloading"
         db.commit()
-        return {"success": False, "error": video.error_msg}
+        try:
+            local_path = download_video(video.original_url, video.id)
+            video.local_path = local_path
+            video.status = "ready"
+            db.commit()
+        except Exception as e:
+            video.status = "failed"
+            video.error_msg = f"Download failed: {e}"
+            db.commit()
+            return {"success": False, "error": video.error_msg}
 
     # 2. Caption
     if not video.ai_caption:
