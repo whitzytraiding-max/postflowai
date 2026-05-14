@@ -90,7 +90,7 @@ export default function Dashboard() {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [userId]);
+  }, []);
 
   function showToast(msg, type = "success") {
     setToast({ msg, type });
@@ -102,7 +102,7 @@ export default function Dashboard() {
     try {
       const result = await runDiscovery();
       showToast(`Discovery complete! Found ${result.discovered} new video(s).`);
-      const q = await getQueue(userId);
+      const q = await getQueue();
       setQueue(q);
     } catch (e) {
       showToast("Discovery failed. Is the backend running?", "error");

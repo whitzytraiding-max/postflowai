@@ -63,6 +63,9 @@ def _run_migrations():
     from sqlalchemy import text
     migrations = [
         "ALTER TABLE sources ADD COLUMN IF NOT EXISTS auto_approve BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE sources ADD COLUMN IF NOT EXISTS instagram_account_id VARCHAR",
+        "ALTER TABLE sources ADD COLUMN IF NOT EXISTS youtube_account_id VARCHAR",
+        "ALTER TABLE sources ADD COLUMN IF NOT EXISTS language VARCHAR DEFAULT 'any'",
     ]
     with engine.connect() as conn:
         for sql in migrations:

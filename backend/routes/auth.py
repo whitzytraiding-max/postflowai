@@ -37,3 +37,29 @@ def login(body: AuthBody, db: Session = Depends(get_db)):
 @router.get("/me")
 def me(current_user: User = Depends(get_current_user)):
     return {"user_id": current_user.id, "email": current_user.email, "api_key": current_user.api_key}
+
+
+@router.post("/setup")
+def setup(body: AuthBody, db: Session = Depends(get_db)):
+    """One-time first-user setup. Links existing legacy data (user_id='dev-user-123') to the new account."""
+    if db.query(User).count() > 0:
+        raise HTTPException(status_code=403, detail="Setup already complete")
+    if len(body.password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+    user = User(email=body.email.lower(), password_hash=hash_password(body.password))
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    # Migrate all legacy data (hardcoded dev-user-123) to this new account
+    from sqlalchemy import text
+    legacy = "dev-user-123"
+    tables = ["sources", "queued_videos", "connected_accounts", "post_history", "autopilot_settings"]
+    for table in tables:
+        try:
+            db.execute(text(f"UPDATE {table} SET user_id = :new WHERE user_id = :old"), {"new": user.id, "old": legacy})
+        except Exception:
+            pass
+    db.commit()
+
+    return {"token": create_token(user.id), "user_id": user.id, "email": user.email, "api_key": user.api_key}
