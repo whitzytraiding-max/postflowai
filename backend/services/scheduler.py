@@ -63,10 +63,10 @@ def schedule_daily_posts():
             if slots_needed == 0:
                 continue
 
-            # Get oldest pending videos
+            # Get oldest pending/ready videos (ready = auto-approved)
             pending = db.query(QueuedVideo).filter(
                 QueuedVideo.user_id == user_id,
-                QueuedVideo.status == "pending",
+                QueuedVideo.status.in_(["pending", "ready"]),
             ).order_by(QueuedVideo.created_at.asc()).limit(slots_needed).all()
 
             if not pending:
@@ -74,7 +74,7 @@ def schedule_daily_posts():
                 _run_discovery_for_user(user_id, db)
                 pending = db.query(QueuedVideo).filter(
                     QueuedVideo.user_id == user_id,
-                    QueuedVideo.status == "pending",
+                    QueuedVideo.status.in_(["pending", "ready"]),
                 ).order_by(QueuedVideo.created_at.asc()).limit(slots_needed).all()
 
             total_slots = settings.posts_per_day
@@ -131,7 +131,42 @@ def _run_discovery_for_user(user_id: str, db):
             print(f"[Scheduler] Discovery error: {e}")
 
 
+def _maybe_schedule_today():
+    """
+    Called on startup. If no videos are scheduled for today yet, run schedule_daily_posts now.
+    Covers the case where the server was down at midnight and missed the cron.
+    """
+    db = SessionLocal()
+    try:
+        now = datetime.utcnow()
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        today_end = today_start + timedelta(days=1)
+
+        settings_list = db.query(AutopilotSettings).filter(
+            AutopilotSettings.enabled == True
+        ).all()
+
+        needs_scheduling = False
+        for settings in settings_list:
+            already_scheduled = db.query(QueuedVideo).filter(
+                QueuedVideo.user_id == settings.user_id,
+                QueuedVideo.status == "scheduled",
+                QueuedVideo.scheduled_at >= today_start,
+                QueuedVideo.scheduled_at < today_end,
+            ).count()
+            if already_scheduled < settings.posts_per_day:
+                needs_scheduling = True
+                break
+
+        if needs_scheduling:
+            print("[Scheduler] Missed midnight cron — running schedule_daily_posts on startup")
+            schedule_daily_posts()
+    finally:
+        db.close()
+
+
 def start_scheduler():
+    _maybe_schedule_today()
     scheduler.add_job(daily_discovery, "interval", hours=6, id="daily_discovery", replace_existing=True)
     scheduler.add_job(schedule_daily_posts, "cron", hour=0, minute=0, id="schedule_daily_posts", replace_existing=True)
     scheduler.add_job(check_and_post_scheduled, "interval", minutes=15, id="check_and_post", replace_existing=True)
