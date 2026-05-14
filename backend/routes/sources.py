@@ -16,6 +16,8 @@ class CreateSourceBody(BaseModel):
     max_age_days: Optional[int] = 7
     videos_per_day: Optional[int] = 3
     post_to_platform: str
+    instagram_account_id: Optional[str] = None
+    youtube_account_id: Optional[str] = None
     language: Optional[str] = "any"
     auto_approve: Optional[bool] = False
 
@@ -26,6 +28,8 @@ class UpdateSourceBody(BaseModel):
     max_age_days: Optional[int] = None
     videos_per_day: Optional[int] = None
     post_to_platform: Optional[str] = None
+    instagram_account_id: Optional[str] = None
+    youtube_account_id: Optional[str] = None
     tag: Optional[str] = None
     language: Optional[str] = None
     auto_approve: Optional[bool] = None
@@ -46,6 +50,8 @@ def create_source(body: CreateSourceBody, current_user: User = Depends(get_curre
         max_age_days=body.max_age_days,
         videos_per_day=body.videos_per_day,
         post_to_platform=body.post_to_platform,
+        instagram_account_id=body.instagram_account_id,
+        youtube_account_id=body.youtube_account_id,
         language=body.language or "any",
         auto_approve=body.auto_approve or False,
     )

@@ -32,6 +32,8 @@ class Source(Base):
     max_age_days = Column(Integer, default=7)
     videos_per_day = Column(Integer, default=3)
     post_to_platform = Column(String, nullable=False)  # "instagram", "youtube", "both"
+    instagram_account_id = Column(String, nullable=True)  # specific ConnectedAccount to post to
+    youtube_account_id = Column(String, nullable=True)    # specific ConnectedAccount to post to
     language = Column(String, default="any")            # "any", "en", "es", "ar", etc.
     auto_approve = Column(Boolean, default=False)       # skip manual approval, go straight to ready
     is_active = Column(Boolean, default=True)

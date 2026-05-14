@@ -63,12 +63,26 @@ def run_pipeline(video_id: str, db: Session, user_id: str) -> dict:
             delay = random.randint(4, 10) * 60  # 4-10 min gap between platforms
             print(f"[Pipeline] Waiting {delay//60}min before posting to {target}...")
             time.sleep(delay)
-        # reuse target loop variable below
-        account = db.query(ConnectedAccount).filter(
-            ConnectedAccount.user_id == user_id,
-            ConnectedAccount.platform == target,
-            ConnectedAccount.is_active == True,
-        ).first()
+        # Use source-pinned account if set, otherwise first active account
+        pinned_id = None
+        if video.source:
+            if target == "instagram":
+                pinned_id = video.source.instagram_account_id
+            elif target == "youtube":
+                pinned_id = video.source.youtube_account_id
+
+        if pinned_id:
+            account = db.query(ConnectedAccount).filter(
+                ConnectedAccount.id == pinned_id,
+                ConnectedAccount.user_id == user_id,
+                ConnectedAccount.is_active == True,
+            ).first()
+        else:
+            account = db.query(ConnectedAccount).filter(
+                ConnectedAccount.user_id == user_id,
+                ConnectedAccount.platform == target,
+                ConnectedAccount.is_active == True,
+            ).first()
 
         if not account:
             results.append({"platform": target, "success": False, "error": f"No connected {target} account"})

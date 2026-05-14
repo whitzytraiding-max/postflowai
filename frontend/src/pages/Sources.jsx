@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getSources, createSource, updateSource, deleteSource } from "../lib/api";
+import { getSources, createSource, updateSource, deleteSource, getConnectedAccounts } from "../lib/api";
 
 const COLORS = {
   BG: "#0B0B18",
@@ -63,6 +63,7 @@ const labelStyle = {
 
 export default function Sources() {
   const [sources, setSources] = useState([]);
+  const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -73,23 +74,38 @@ export default function Sources() {
     max_age_days: 7,
     videos_per_day: 3,
     post_to_platform: "youtube",
+    instagram_account_id: "",
+    youtube_account_id: "",
     language: "any",
     auto_approve: false,
   });
 
   useEffect(() => {
-    loadSources();
+    loadAll();
   }, []);
 
-  async function loadSources() {
+  async function loadAll() {
     setLoading(true);
+    try {
+      const [srcData, accData] = await Promise.all([
+        getSources(),
+        getConnectedAccounts().catch(() => []),
+      ]);
+      setSources(srcData);
+      setAccounts(accData);
+    } catch {
+      showToast("Failed to load sources", "error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadSources() {
     try {
       const data = await getSources();
       setSources(data);
     } catch {
       showToast("Failed to load sources", "error");
-    } finally {
-      setLoading(false);
     }
   }
 
@@ -111,9 +127,14 @@ export default function Sources() {
     if (!form.tag.trim()) return showToast("Tag is required", "error");
     setSubmitting(true);
     try {
-      await createSource(form);
+      const payload = {
+        ...form,
+        instagram_account_id: form.instagram_account_id || null,
+        youtube_account_id: form.youtube_account_id || null,
+      };
+      await createSource(payload);
       showToast("Source added!");
-      setForm({ platform: "youtube", tag: "", min_views: 50000, max_age_days: 7, videos_per_day: 3, post_to_platform: "youtube", language: "any", auto_approve: false });
+      setForm({ platform: "youtube", tag: "", min_views: 50000, max_age_days: 7, videos_per_day: 3, post_to_platform: "youtube", instagram_account_id: "", youtube_account_id: "", language: "any", auto_approve: false });
       await loadSources();
     } catch {
       showToast("Failed to create source", "error");
@@ -193,6 +214,30 @@ export default function Sources() {
               </select>
             </div>
           </div>
+          {/* Account selectors — shown based on post_to_platform */}
+          {(form.post_to_platform === "instagram" || form.post_to_platform === "both") && (
+            <div style={{ marginBottom: "16px" }}>
+              <label style={labelStyle}>Post to Instagram Account</label>
+              <select name="instagram_account_id" value={form.instagram_account_id} onChange={handleFormChange} style={inputStyle}>
+                <option value="">— Any active Instagram account —</option>
+                {accounts.filter((a) => a.platform === "instagram" && a.is_active).map((a) => (
+                  <option key={a.id} value={a.id}>{a.account_name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          {(form.post_to_platform === "youtube" || form.post_to_platform === "both") && (
+            <div style={{ marginBottom: "16px" }}>
+              <label style={labelStyle}>Post to YouTube Account</label>
+              <select name="youtube_account_id" value={form.youtube_account_id} onChange={handleFormChange} style={inputStyle}>
+                <option value="">— Any active YouTube account —</option>
+                {accounts.filter((a) => a.platform === "youtube" && a.is_active).map((a) => (
+                  <option key={a.id} value={a.id}>{a.account_name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "16px", marginBottom: "20px" }}>
             <div>
               <label style={labelStyle}>Min Views</label>
@@ -306,6 +351,12 @@ export default function Sources() {
                 : source.min_views >= 1_000
                 ? `${source.min_views / 1_000}K+`
                 : `${source.min_views}+`;
+            const igAccount = source.instagram_account_id
+              ? accounts.find((a) => a.id === source.instagram_account_id)
+              : null;
+            const ytAccount = source.youtube_account_id
+              ? accounts.find((a) => a.id === source.youtube_account_id)
+              : null;
 
             return (
               <div
@@ -344,6 +395,16 @@ export default function Sources() {
                   <div style={{ fontSize: "12px", color: COLORS.MUTED, marginTop: "2px" }}>
                     {viewsLabel} views · {source.max_age_days} days · {source.videos_per_day}/day →{" "}
                     <span style={{ textTransform: "capitalize" }}>{source.post_to_platform}</span>
+                    {igAccount && (
+                      <span style={{ marginLeft: "6px", background: "#7C3AED22", color: "#A855F7", padding: "1px 8px", borderRadius: "10px", fontSize: "11px", fontWeight: 600 }}>
+                        📸 {igAccount.account_name}
+                      </span>
+                    )}
+                    {ytAccount && (
+                      <span style={{ marginLeft: "6px", background: "#EF444422", color: "#EF4444", padding: "1px 8px", borderRadius: "10px", fontSize: "11px", fontWeight: 600 }}>
+                        ▶️ {ytAccount.account_name}
+                      </span>
+                    )}
                     {source.language && source.language !== "any" && (
                       <span style={{ marginLeft: "8px", background: "#7C3AED22", color: "#A78BFA", padding: "1px 8px", borderRadius: "10px", fontSize: "11px", fontWeight: 600 }}>
                         {source.language.toUpperCase()}
