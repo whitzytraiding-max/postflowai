@@ -13,7 +13,12 @@ CLIENTS = ["web", "android", "android_testsuite"]
 
 
 def _get_cookie_file() -> str | None:
-    """Write YOUTUBE_COOKIES env var to a temp file and return its path."""
+    """Return path to YouTube cookies file (Render secret file or env var fallback)."""
+    # Render Secret File takes priority
+    secret_path = "/etc/secrets/youtube_cookies.txt"
+    if os.path.exists(secret_path):
+        return secret_path
+    # Fallback: env var written to a temp file
     cookies = os.environ.get("YOUTUBE_COOKIES", "").strip()
     if not cookies:
         return None
