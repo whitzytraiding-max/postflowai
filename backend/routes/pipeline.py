@@ -65,9 +65,9 @@ def get_pending_downloads(user_id: str, db: Session = Depends(get_db)):
     from models import QueuedVideo
     videos = db.query(QueuedVideo).filter(
         QueuedVideo.user_id == user_id,
-        QueuedVideo.status.in_(["pending", "scheduled", "failed"]),
+        QueuedVideo.status.in_(["pending", "scheduled"]),
         QueuedVideo.local_path == None,
-    ).limit(3).all()
+    ).limit(2).all()
     return [
         {"id": v.id, "original_url": v.original_url, "title": v.title, "status": v.status}
         for v in videos
@@ -99,10 +99,11 @@ async def deliver_video(
         shutil.copyfileobj(file.file, f)
 
     video.local_path = str(dest)
-    video.status = "downloading"
     video.error_msg = None
+    # Keep scheduled videos on their schedule; reset others to ready for the scheduler to pick up
+    if video.status not in ("scheduled",):
+        video.status = "ready"
     db.commit()
 
-    print(f"[Deliver] Received {dest} ({dest.stat().st_size // 1024}KB) for video {video_id}")
-    background_tasks.add_task(run_pipeline_bg, video_id, user_id)
+    print(f"[Deliver] Received {dest} ({dest.stat().st_size // 1024}KB) for video {video_id} — status={video.status}")
     return {"status": "received", "video_id": video_id, "path": str(dest)}
