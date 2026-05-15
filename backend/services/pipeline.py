@@ -59,10 +59,13 @@ def run_pipeline(video_id: str, db: Session, user_id: str) -> dict:
 
     results = []
     for i, target in enumerate(targets):
-        if i > 0:
-            delay = random.randint(4, 10) * 60  # 4-10 min gap between platforms
-            print(f"[Pipeline] Waiting {delay//60}min before posting to {target}...")
-            time.sleep(delay)
+        # Human-like pre-post pause: 1–8 min before first post, 4–12 min between platforms
+        if i == 0:
+            delay = random.randint(60, 480)
+        else:
+            delay = random.randint(240, 720)
+        print(f"[Pipeline] Waiting {delay//60}m {delay%60}s before posting to {target}...")
+        time.sleep(delay)
         # Use source-pinned account if set, otherwise first active account
         pinned_id = None
         if video.source:
