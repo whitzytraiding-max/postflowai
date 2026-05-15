@@ -48,10 +48,9 @@ def retry_video_pipeline(video_id: str, background_tasks: BackgroundTasks, curre
 
 
 @router.get("/pending-downloads")
-def get_pending_downloads(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def get_pending_downloads(db: Session = Depends(get_db)):
     from models import QueuedVideo
     videos = db.query(QueuedVideo).filter(
-        QueuedVideo.user_id == current_user.id,
         QueuedVideo.status.in_(["pending", "scheduled"]),
         QueuedVideo.local_path == None,
     ).limit(2).all()
@@ -59,9 +58,9 @@ def get_pending_downloads(current_user: User = Depends(get_current_user), db: Se
 
 
 @router.post("/{video_id}/deliver")
-async def deliver_video(video_id: str, background_tasks: BackgroundTasks, file: UploadFile = File(...), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+async def deliver_video(video_id: str, background_tasks: BackgroundTasks, file: UploadFile = File(...), db: Session = Depends(get_db)):
     from models import QueuedVideo
-    video = db.query(QueuedVideo).filter(QueuedVideo.id == video_id, QueuedVideo.user_id == current_user.id).first()
+    video = db.query(QueuedVideo).filter(QueuedVideo.id == video_id).first()
     if not video:
         return {"error": "Not found"}
 
