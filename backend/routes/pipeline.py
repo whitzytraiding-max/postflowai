@@ -50,10 +50,14 @@ def retry_video_pipeline(video_id: str, background_tasks: BackgroundTasks, curre
 @router.get("/pending-downloads")
 def get_pending_downloads(db: Session = Depends(get_db)):
     from models import QueuedVideo
+    from datetime import datetime, timedelta
+    # Include pending (no schedule yet) + scheduled within next 3 hours
+    cutoff = datetime.utcnow() + timedelta(hours=3)
     videos = db.query(QueuedVideo).filter(
         QueuedVideo.status.in_(["pending", "scheduled"]),
         QueuedVideo.local_path == None,
-    ).limit(2).all()
+        (QueuedVideo.scheduled_at == None) | (QueuedVideo.scheduled_at <= cutoff),
+    ).order_by(QueuedVideo.scheduled_at.asc().nullsfirst()).limit(3).all()
     return [{"id": v.id, "original_url": v.original_url, "title": v.title, "status": v.status} for v in videos]
 
 
