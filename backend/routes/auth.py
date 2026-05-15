@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from typing import Optional
 from database import get_db
 from models import User
-from services.auth import hash_password, verify_password, create_token, get_current_user
+from services.auth import hash_password, verify_password, create_token, get_current_user, SECRET_KEY
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -90,3 +90,14 @@ def admin_reset(body: AdminResetBody, db: Session = Depends(get_db)):
     user.password_hash = hash_password(body.new_password)
     db.commit()
     return {"ok": True, "user_id": user.id, "email": user.email, "api_key": user.api_key, "token": create_token(user.id)}
+
+
+@router.get("/admin/recover")
+def admin_recover(secret: str, db: Session = Depends(get_db)):
+    """Return first user's token using JWT_SECRET as the secret. Used for account recovery."""
+    if secret != SECRET_KEY:
+        raise HTTPException(status_code=403, detail="Invalid secret")
+    user = db.query(User).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="No user found")
+    return {"user_id": user.id, "email": user.email, "api_key": user.api_key, "token": create_token(user.id)}
