@@ -1,6 +1,8 @@
+import os
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
+from typing import Optional
 from database import get_db
 from models import User
 from services.auth import hash_password, verify_password, create_token, get_current_user
@@ -63,3 +65,28 @@ def setup(body: AuthBody, db: Session = Depends(get_db)):
     db.commit()
 
     return {"token": create_token(user.id), "user_id": user.id, "email": user.email, "api_key": user.api_key}
+
+
+class AdminResetBody(BaseModel):
+    admin_secret: str
+    new_password: str
+    email: Optional[str] = None
+
+
+@router.post("/admin/reset")
+def admin_reset(body: AdminResetBody, db: Session = Depends(get_db)):
+    """Reset password for any user using ADMIN_SECRET env var. Returns user info."""
+    secret = os.getenv("ADMIN_SECRET")
+    if not secret or body.admin_secret != secret:
+        raise HTTPException(status_code=403, detail="Invalid admin secret")
+    if len(body.new_password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+    if body.email:
+        user = db.query(User).filter(User.email == body.email.lower()).first()
+    else:
+        user = db.query(User).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="No user found")
+    user.password_hash = hash_password(body.new_password)
+    db.commit()
+    return {"ok": True, "user_id": user.id, "email": user.email, "api_key": user.api_key, "token": create_token(user.id)}
