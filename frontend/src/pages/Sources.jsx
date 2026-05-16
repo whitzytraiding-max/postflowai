@@ -61,24 +61,29 @@ const labelStyle = {
   letterSpacing: "0.04em",
 };
 
+const BLANK_FORM = {
+  platform: "youtube",
+  tag: "",
+  min_views: 50000,
+  max_age_days: 7,
+  videos_per_day: 3,
+  post_to_platform: "youtube",
+  instagram_account_id: "",
+  youtube_account_id: "",
+  language: "any",
+  auto_approve: false,
+};
+
 export default function Sources() {
   const [sources, setSources] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
   const [submitting, setSubmitting] = useState(false);
-  const [form, setForm] = useState({
-    platform: "youtube",
-    tag: "",
-    min_views: 50000,
-    max_age_days: 7,
-    videos_per_day: 3,
-    post_to_platform: "youtube",
-    instagram_account_id: "",
-    youtube_account_id: "",
-    language: "any",
-    auto_approve: false,
-  });
+  const [form, setForm] = useState(BLANK_FORM);
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     loadAll();
@@ -134,7 +139,7 @@ export default function Sources() {
       };
       await createSource(payload);
       showToast("Source added!");
-      setForm({ platform: "youtube", tag: "", min_views: 50000, max_age_days: 7, videos_per_day: 3, post_to_platform: "youtube", instagram_account_id: "", youtube_account_id: "", language: "any", auto_approve: false });
+      setForm(BLANK_FORM);
       await loadSources();
     } catch {
       showToast("Failed to create source", "error");
@@ -160,6 +165,48 @@ export default function Sources() {
       showToast("Source deleted");
     } catch {
       showToast("Failed to delete", "error");
+    }
+  }
+
+  function startEdit(source) {
+    setEditingId(source.id);
+    setEditForm({
+      tag: source.tag,
+      min_views: source.min_views,
+      max_age_days: source.max_age_days,
+      videos_per_day: source.videos_per_day,
+      post_to_platform: source.post_to_platform,
+      instagram_account_id: source.instagram_account_id || "",
+      youtube_account_id: source.youtube_account_id || "",
+      language: source.language || "any",
+      auto_approve: source.auto_approve || false,
+    });
+  }
+
+  function handleEditChange(e) {
+    const { name, value, type, checked } = e.target;
+    setEditForm((f) => ({
+      ...f,
+      [name]: type === "checkbox" ? checked : type === "number" ? Number(value) : value,
+    }));
+  }
+
+  async function handleSaveEdit(id) {
+    setSaving(true);
+    try {
+      const payload = {
+        ...editForm,
+        instagram_account_id: editForm.instagram_account_id || null,
+        youtube_account_id: editForm.youtube_account_id || null,
+      };
+      const updated = await updateSource(id, payload);
+      setSources((prev) => prev.map((s) => (s.id === id ? updated : s)));
+      setEditingId(null);
+      showToast("Source updated!");
+    } catch {
+      showToast("Failed to save changes", "error");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -358,102 +405,248 @@ export default function Sources() {
               ? accounts.find((a) => a.id === source.youtube_account_id)
               : null;
 
+            const isEditing = editingId === source.id;
+
             return (
               <div
                 key={source.id}
                 style={{
                   background: COLORS.CARD,
                   borderRadius: "12px",
-                  padding: "18px 20px",
-                  border: "1px solid #1E1E35",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "16px",
+                  border: `1px solid ${isEditing ? COLORS.SECONDARY : "#1E1E35"}`,
                   opacity: source.is_active ? 1 : 0.55,
+                  overflow: "hidden",
+                  transition: "border-color 0.15s",
                 }}
               >
-                {/* Platform badge */}
-                <span
-                  style={{
-                    background: pc.bg,
-                    color: pc.color,
-                    padding: "4px 12px",
-                    borderRadius: "20px",
-                    fontSize: "12px",
-                    fontWeight: 700,
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {pc.label}
-                </span>
+                {/* Summary row */}
+                <div style={{ padding: "18px 20px", display: "flex", alignItems: "center", gap: "16px" }}>
+                  {/* Platform badge */}
+                  <span
+                    style={{
+                      background: pc.bg,
+                      color: pc.color,
+                      padding: "4px 12px",
+                      borderRadius: "20px",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {pc.label}
+                  </span>
 
-                {/* Tag */}
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: "18px", fontWeight: 700, color: COLORS.TEXT }}>
-                    {source.tag}
+                  {/* Tag + stats */}
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: "18px", fontWeight: 700, color: COLORS.TEXT }}>
+                      {source.tag}
+                    </div>
+                    <div style={{ fontSize: "12px", color: COLORS.MUTED, marginTop: "2px" }}>
+                      {viewsLabel} views · {source.max_age_days} days · {source.videos_per_day}/day →{" "}
+                      <span style={{ textTransform: "capitalize" }}>{source.post_to_platform}</span>
+                      {igAccount && (
+                        <span style={{ marginLeft: "6px", background: "#7C3AED22", color: "#A855F7", padding: "1px 8px", borderRadius: "10px", fontSize: "11px", fontWeight: 600 }}>
+                          📸 {igAccount.account_name}
+                        </span>
+                      )}
+                      {ytAccount && (
+                        <span style={{ marginLeft: "6px", background: "#EF444422", color: "#EF4444", padding: "1px 8px", borderRadius: "10px", fontSize: "11px", fontWeight: 600 }}>
+                          ▶️ {ytAccount.account_name}
+                        </span>
+                      )}
+                      {source.language && source.language !== "any" && (
+                        <span style={{ marginLeft: "8px", background: "#7C3AED22", color: "#A78BFA", padding: "1px 8px", borderRadius: "10px", fontSize: "11px", fontWeight: 600 }}>
+                          {source.language.toUpperCase()}
+                        </span>
+                      )}
+                      {source.auto_approve && (
+                        <span style={{ marginLeft: "8px", background: "#10B98122", color: "#10B981", padding: "1px 8px", borderRadius: "10px", fontSize: "11px", fontWeight: 600 }}>
+                          AUTO-APPROVE
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div style={{ fontSize: "12px", color: COLORS.MUTED, marginTop: "2px" }}>
-                    {viewsLabel} views · {source.max_age_days} days · {source.videos_per_day}/day →{" "}
-                    <span style={{ textTransform: "capitalize" }}>{source.post_to_platform}</span>
-                    {igAccount && (
-                      <span style={{ marginLeft: "6px", background: "#7C3AED22", color: "#A855F7", padding: "1px 8px", borderRadius: "10px", fontSize: "11px", fontWeight: 600 }}>
-                        📸 {igAccount.account_name}
-                      </span>
-                    )}
-                    {ytAccount && (
-                      <span style={{ marginLeft: "6px", background: "#EF444422", color: "#EF4444", padding: "1px 8px", borderRadius: "10px", fontSize: "11px", fontWeight: 600 }}>
-                        ▶️ {ytAccount.account_name}
-                      </span>
-                    )}
-                    {source.language && source.language !== "any" && (
-                      <span style={{ marginLeft: "8px", background: "#7C3AED22", color: "#A78BFA", padding: "1px 8px", borderRadius: "10px", fontSize: "11px", fontWeight: 600 }}>
-                        {source.language.toUpperCase()}
-                      </span>
-                    )}
-                    {source.auto_approve && (
-                      <span style={{ marginLeft: "8px", background: "#10B98122", color: "#10B981", padding: "1px 8px", borderRadius: "10px", fontSize: "11px", fontWeight: 600 }}>
-                        AUTO-APPROVE
-                      </span>
-                    )}
-                  </div>
+
+                  {/* Toggle */}
+                  <button
+                    onClick={() => handleToggle(source)}
+                    style={{
+                      background: source.is_active ? COLORS.PRIMARY + "22" : "#ffffff11",
+                      color: source.is_active ? COLORS.PRIMARY : COLORS.MUTED,
+                      border: `1px solid ${source.is_active ? COLORS.PRIMARY : "#1E1E35"}`,
+                      borderRadius: "6px",
+                      padding: "5px 12px",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {source.is_active ? "Active" : "Paused"}
+                  </button>
+
+                  {/* Edit */}
+                  <button
+                    onClick={() => isEditing ? setEditingId(null) : startEdit(source)}
+                    style={{
+                      background: isEditing ? COLORS.SECONDARY + "33" : "transparent",
+                      color: isEditing ? "#A78BFA" : COLORS.MUTED,
+                      border: `1px solid ${isEditing ? COLORS.SECONDARY : "#1E1E35"}`,
+                      borderRadius: "6px",
+                      padding: "5px 10px",
+                      fontSize: "14px",
+                      cursor: "pointer",
+                      transition: "all 0.15s",
+                    }}
+                    onMouseEnter={(e) => { if (!isEditing) { e.currentTarget.style.color = "#A78BFA"; e.currentTarget.style.borderColor = COLORS.SECONDARY; } }}
+                    onMouseLeave={(e) => { if (!isEditing) { e.currentTarget.style.color = COLORS.MUTED; e.currentTarget.style.borderColor = "#1E1E35"; } }}
+                    title={isEditing ? "Cancel edit" : "Edit source"}
+                  >
+                    ✏️
+                  </button>
+
+                  {/* Delete */}
+                  <button
+                    onClick={() => handleDelete(source.id)}
+                    style={{
+                      background: "transparent",
+                      color: COLORS.MUTED,
+                      border: "1px solid #1E1E35",
+                      borderRadius: "6px",
+                      padding: "5px 10px",
+                      fontSize: "14px",
+                      cursor: "pointer",
+                      transition: "all 0.15s",
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = COLORS.ERROR; e.currentTarget.style.borderColor = COLORS.ERROR; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = COLORS.MUTED; e.currentTarget.style.borderColor = "#1E1E35"; }}
+                    title="Delete source"
+                  >
+                    🗑️
+                  </button>
                 </div>
 
-                {/* Toggle */}
-                <button
-                  onClick={() => handleToggle(source)}
-                  style={{
-                    background: source.is_active ? COLORS.PRIMARY + "22" : "#ffffff11",
-                    color: source.is_active ? COLORS.PRIMARY : COLORS.MUTED,
-                    border: `1px solid ${source.is_active ? COLORS.PRIMARY : "#1E1E35"}`,
-                    borderRadius: "6px",
-                    padding: "5px 12px",
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  {source.is_active ? "Active" : "Paused"}
-                </button>
-
-                {/* Delete */}
-                <button
-                  onClick={() => handleDelete(source.id)}
-                  style={{
-                    background: "transparent",
-                    color: COLORS.MUTED,
-                    border: "1px solid #1E1E35",
-                    borderRadius: "6px",
-                    padding: "5px 10px",
-                    fontSize: "14px",
-                    cursor: "pointer",
-                    transition: "all 0.15s",
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.color = COLORS.ERROR; e.currentTarget.style.borderColor = COLORS.ERROR; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = COLORS.MUTED; e.currentTarget.style.borderColor = "#1E1E35"; }}
-                  title="Delete source"
-                >
-                  🗑️
-                </button>
+                {/* Inline edit form */}
+                {isEditing && (
+                  <div style={{ padding: "0 20px 20px", borderTop: "1px solid #1E1E35" }}>
+                    <p style={{ fontSize: "12px", color: COLORS.MUTED, margin: "14px 0 16px", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
+                      Edit Source
+                    </p>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "14px", marginBottom: "14px" }}>
+                      <div>
+                        <label style={labelStyle}>Tag / Keyword</label>
+                        <input name="tag" value={editForm.tag} onChange={handleEditChange} style={inputStyle} />
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Post To</label>
+                        <select name="post_to_platform" value={editForm.post_to_platform} onChange={handleEditChange} style={inputStyle}>
+                          <option value="instagram">Instagram</option>
+                          <option value="youtube">YouTube</option>
+                          <option value="both">Both</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Language</label>
+                        <select name="language" value={editForm.language} onChange={handleEditChange} style={inputStyle}>
+                          <option value="any">Any Language</option>
+                          <option value="en">English</option>
+                          <option value="es">Spanish</option>
+                          <option value="ar">Arabic</option>
+                          <option value="fr">French</option>
+                          <option value="hi">Hindi</option>
+                          <option value="pt">Portuguese</option>
+                          <option value="id">Indonesian</option>
+                          <option value="de">German</option>
+                          <option value="ja">Japanese</option>
+                          <option value="ko">Korean</option>
+                          <option value="tr">Turkish</option>
+                          <option value="ru">Russian</option>
+                          <option value="zh">Chinese</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "14px", marginBottom: "14px" }}>
+                      <div>
+                        <label style={labelStyle}>Min Views</label>
+                        <input name="min_views" type="number" value={editForm.min_views} onChange={handleEditChange} style={inputStyle} />
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Max Age (days)</label>
+                        <input name="max_age_days" type="number" value={editForm.max_age_days} onChange={handleEditChange} style={inputStyle} />
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Videos Per Day</label>
+                        <input name="videos_per_day" type="number" value={editForm.videos_per_day} onChange={handleEditChange} style={inputStyle} />
+                      </div>
+                    </div>
+                    {(editForm.post_to_platform === "instagram" || editForm.post_to_platform === "both") && (
+                      <div style={{ marginBottom: "14px" }}>
+                        <label style={labelStyle}>Post to Instagram Account</label>
+                        <select name="instagram_account_id" value={editForm.instagram_account_id} onChange={handleEditChange} style={inputStyle}>
+                          <option value="">— Any active Instagram account —</option>
+                          {accounts.filter((a) => a.platform === "instagram" && a.is_active).map((a) => (
+                            <option key={a.id} value={a.id}>{a.account_name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    {(editForm.post_to_platform === "youtube" || editForm.post_to_platform === "both") && (
+                      <div style={{ marginBottom: "14px" }}>
+                        <label style={labelStyle}>Post to YouTube Account</label>
+                        <select name="youtube_account_id" value={editForm.youtube_account_id} onChange={handleEditChange} style={inputStyle}>
+                          <option value="">— Any active YouTube account —</option>
+                          {accounts.filter((a) => a.platform === "youtube" && a.is_active).map((a) => (
+                            <option key={a.id} value={a.id}>{a.account_name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
+                        <input
+                          type="checkbox"
+                          name="auto_approve"
+                          checked={editForm.auto_approve}
+                          onChange={handleEditChange}
+                          style={{ width: "16px", height: "16px", accentColor: "#10B981", cursor: "pointer" }}
+                        />
+                        <span style={{ fontSize: "13px", color: COLORS.TEXT, fontWeight: 500 }}>Auto-approve videos</span>
+                      </label>
+                      <div style={{ display: "flex", gap: "10px" }}>
+                        <button
+                          onClick={() => setEditingId(null)}
+                          style={{
+                            background: "transparent",
+                            color: COLORS.MUTED,
+                            border: "1px solid #1E1E35",
+                            borderRadius: "6px",
+                            padding: "8px 16px",
+                            fontSize: "13px",
+                            fontWeight: 600,
+                            cursor: "pointer",
+                          }}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => handleSaveEdit(source.id)}
+                          disabled={saving}
+                          style={{
+                            background: saving ? COLORS.MUTED : COLORS.SECONDARY,
+                            color: "#fff",
+                            border: "none",
+                            borderRadius: "6px",
+                            padding: "8px 20px",
+                            fontSize: "13px",
+                            fontWeight: 700,
+                            cursor: saving ? "not-allowed" : "pointer",
+                          }}
+                        >
+                          {saving ? "Saving..." : "Save Changes"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}
