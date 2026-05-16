@@ -28,10 +28,13 @@ def run_pipeline(video_id: str, db: Session, user_id: str) -> dict:
         db.commit()
     elif os.environ.get("RENDER"):
         # On Render we can't download from YouTube directly (datacenter IP block).
-        # Leave status unchanged so check_and_post retries next tick and
-        # deliver endpoint can keep the correct status when the agent uploads.
+        # Keep "scheduled" as-is so check_and_post retries on the next tick.
+        # Reset any transient state ("downloading", "posting", etc.) to "pending"
+        # so the Windows agent picks it up and deliver sets it to "ready".
         print(f"[Pipeline] No local file for {video_id} — waiting for Windows agent (status={video.status})")
         video.local_path = None
+        if video.status not in ("scheduled",):
+            video.status = "pending"
         db.commit()
         return {"success": False, "error": "Waiting for Windows agent to deliver file"}
     else:
