@@ -107,11 +107,14 @@ def check_and_post_scheduled():
     db = SessionLocal()
     try:
         now = datetime.utcnow()
-        # Only post ONE video per tick — prevents burst-posting if multiple missed their window
+        # Only post ONE video per tick — prevents burst-posting if multiple missed their window.
+        # Also pick up "ready" videos stuck from the pending→ready race (file delivered but status
+        # was never restored to "scheduled") and "pending" videos with a file already on disk.
         video = db.query(QueuedVideo).filter(
-            QueuedVideo.status == "scheduled",
-            QueuedVideo.scheduled_at <= now,
-        ).order_by(QueuedVideo.scheduled_at.asc()).first()
+            QueuedVideo.status.in_(["scheduled", "ready"]),
+            (QueuedVideo.scheduled_at == None) | (QueuedVideo.scheduled_at <= now),
+            QueuedVideo.local_path != None,
+        ).order_by(QueuedVideo.scheduled_at.asc().nullsfirst()).first()
 
         if video:
             # Enforce 1-hour minimum gap per platform
