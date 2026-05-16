@@ -1,8 +1,45 @@
 import json
+import os
+import subprocess
+import tempfile
 import time
 import random
 import hashlib
+import imageio_ffmpeg
 from instagrapi import Client
+
+FFMPEG = imageio_ffmpeg.get_ffmpeg_exe()
+
+
+def _encode_for_instagram(input_path: str) -> str:
+    """
+    Re-encode to Instagram Reels specs: H.264 High, CRF 18, AAC 192k.
+    Scales up to 1080p width if the video is smaller.
+    Returns path to the encoded file (caller should clean it up).
+    """
+    fd, out_path = tempfile.mkstemp(suffix="_ig.mp4")
+    os.close(fd)
+    cmd = [
+        FFMPEG, "-i", input_path,
+        # Scale width to at least 1080px, keep aspect ratio, height divisible by 2
+        "-vf", "scale='max(iw,1080)':-2",
+        "-c:v", "libx264",
+        "-profile:v", "high",
+        "-level:v", "4.0",
+        "-crf", "18",
+        "-preset", "fast",
+        "-c:a", "aac",
+        "-b:a", "192k",
+        "-ar", "44100",
+        "-movflags", "+faststart",
+        "-y", out_path,
+    ]
+    result = subprocess.run(cmd, capture_output=True)
+    if result.returncode != 0:
+        os.unlink(out_path)
+        raise RuntimeError(f"ffmpeg encode failed: {result.stderr.decode()[-500:]}")
+    print(f"[Instagram] Encoded for upload: {os.path.getsize(out_path) // 1024}KB → {out_path}")
+    return out_path
 
 # Pool of realistic Android devices. Each account gets one derived
 # deterministically from its session_id so the same account always
@@ -113,5 +150,10 @@ def post_to_instagram(local_path: str, caption: str, credentials_json: str) -> s
 
     _warmup(cl)
 
-    media = cl.clip_upload(local_path, caption=caption)
+    encoded_path = _encode_for_instagram(local_path)
+    try:
+        media = cl.clip_upload(encoded_path, caption=caption)
+    finally:
+        os.unlink(encoded_path)
+
     return f"https://www.instagram.com/reel/{media.code}/"

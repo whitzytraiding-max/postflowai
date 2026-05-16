@@ -35,7 +35,7 @@ def download_video(url: str, video_id: str, tmpdir: str) -> str | None:
     out_path = os.path.join(tmpdir, f"{video_id}.%(ext)s")
     opts = {
         "outtmpl": out_path,
-        "format": "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[height<=720]",
+        "format": "bestvideo[height>=1080][ext=mp4]+bestaudio[ext=m4a]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best",
         "merge_output_format": "mp4",
         "quiet": False,
         "no_warnings": True,
