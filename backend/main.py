@@ -7,7 +7,9 @@ from sqlalchemy.orm import Session
 from database import engine, Base, get_db
 from routes import sources, queue, discovery, accounts, pipeline, settings, autopilot
 from routes.auth import router as auth_router
+from services.auth import get_current_user
 from services.scheduler import start_scheduler
+from models import User
 
 _pot_proc = None
 
@@ -87,11 +89,11 @@ def health():
 
 
 @app.get("/post-history")
-def get_post_history(user_id: str, db: Session = Depends(get_db)):
+def get_post_history(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     from models import PostHistory
     return (
         db.query(PostHistory)
-        .filter(PostHistory.user_id == user_id)
+        .filter(PostHistory.user_id == current_user.id)
         .order_by(PostHistory.posted_at.desc())
         .limit(50)
         .all()

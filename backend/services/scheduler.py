@@ -170,10 +170,28 @@ def _run_discovery_for_user(user_id: str, db):
             print(f"[Scheduler] Discovery error: {e}")
 
 
+def _recover_stuck_posting():
+    """
+    Called on startup. Resets any video stuck in 'posting' back to 'ready'
+    so it can be retried. Happens when Render restarts mid-pipeline.
+    """
+    db = SessionLocal()
+    try:
+        stuck = db.query(QueuedVideo).filter(QueuedVideo.status == "posting").all()
+        for v in stuck:
+            v.status = "ready"
+            print(f"[Scheduler] Recovered stuck 'posting' video: {v.id} ({v.title[:40] if v.title else '?'})")
+        if stuck:
+            db.commit()
+    finally:
+        db.close()
+
+
 def _maybe_schedule_today():
     """
     Called on startup. If any source has unfilled slots for today, run schedule_daily_posts.
     Covers the case where the server was down at midnight and missed the cron.
+    Checks slot counts directly so discovery runs even when queue is empty.
     """
     db = SessionLocal()
     try:
@@ -191,7 +209,16 @@ def _maybe_schedule_today():
                 Source.user_id == settings.user_id,
                 Source.is_active == True,
             ).all()
-            if _collect_slots(active_sources, today_start, today_end, db):
+            total_target = sum(s.videos_per_day for s in active_sources)
+            if not total_target:
+                continue
+            already_scheduled = db.query(QueuedVideo).filter(
+                QueuedVideo.user_id == settings.user_id,
+                QueuedVideo.status == "scheduled",
+                QueuedVideo.scheduled_at >= today_start,
+                QueuedVideo.scheduled_at < today_end,
+            ).count()
+            if already_scheduled < total_target:
                 needs_scheduling = True
                 break
 
@@ -203,6 +230,7 @@ def _maybe_schedule_today():
 
 
 def start_scheduler():
+    _recover_stuck_posting()
     _maybe_schedule_today()
     scheduler.add_job(daily_discovery, "interval", hours=6, id="daily_discovery", replace_existing=True)
     scheduler.add_job(schedule_daily_posts, "cron", hour=0, minute=0, id="schedule_daily_posts", replace_existing=True)
