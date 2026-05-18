@@ -30,8 +30,9 @@ def daily_discovery():
 
 def schedule_daily_posts():
     """
-    Runs at midnight. For each autopilot user, picks today's videos and
-    assigns evenly-spaced scheduled_at times throughout the day.
+    Runs at midnight. For each autopilot user, schedules videos per-source:
+    each source's videos_per_day setting drives how many slots it gets today.
+    Times are spread evenly across the user's start_hour–end_hour window.
     """
     print("[Scheduler] Scheduling today's autopilot posts...")
     db = SessionLocal()
@@ -47,50 +48,39 @@ def schedule_daily_posts():
         for settings in settings_list:
             user_id = settings.user_id
 
-            # Disable if end_date has passed
             if settings.end_date and now > settings.end_date:
                 settings.enabled = False
                 db.commit()
                 print(f"[Scheduler] Autopilot ended for user {user_id}")
                 continue
 
-            # Count how many are already scheduled for today
-            already_scheduled = db.query(QueuedVideo).filter(
-                QueuedVideo.user_id == user_id,
-                QueuedVideo.status == "scheduled",
-                QueuedVideo.scheduled_at >= today_start,
-                QueuedVideo.scheduled_at < today_end,
-            ).count()
+            active_sources = db.query(Source).filter(
+                Source.user_id == user_id,
+                Source.is_active == True,
+            ).all()
 
-            slots_needed = max(0, settings.posts_per_day - already_scheduled)
-            if slots_needed == 0:
+            if not active_sources:
                 continue
 
-            # Get oldest pending/ready videos (ready = auto-approved)
-            pending = db.query(QueuedVideo).filter(
-                QueuedVideo.user_id == user_id,
-                QueuedVideo.status.in_(["pending", "ready"]),
-            ).order_by(QueuedVideo.created_at.asc()).limit(slots_needed).all()
+            to_schedule = _collect_slots(active_sources, today_start, today_end, db)
 
-            if not pending:
+            if not to_schedule:
                 print(f"[Scheduler] No pending videos for user {user_id} — running discovery")
                 _run_discovery_for_user(user_id, db)
-                pending = db.query(QueuedVideo).filter(
-                    QueuedVideo.user_id == user_id,
-                    QueuedVideo.status.in_(["pending", "ready"]),
-                ).order_by(QueuedVideo.created_at.asc()).limit(slots_needed).all()
+                to_schedule = _collect_slots(active_sources, today_start, today_end, db)
 
-            total_slots = settings.posts_per_day
+            if not to_schedule:
+                continue
+
+            window_start = today_start.replace(hour=settings.start_hour)
+            window_end = today_start.replace(hour=settings.end_hour)
             window_minutes = (settings.end_hour - settings.start_hour) * 60
-            interval_minutes = window_minutes / max(total_slots, 1)
+            interval_minutes = window_minutes / max(len(to_schedule), 1)
 
-            for i, video in enumerate(pending):
-                slot_offset = int(interval_minutes * (already_scheduled + i))
-                variance = random.randint(-20, 20)  # ±20 min human-like drift
-                post_time = today_start.replace(hour=settings.start_hour) + timedelta(minutes=slot_offset + variance)
-                # Keep within the allowed window
-                window_start = today_start.replace(hour=settings.start_hour)
-                window_end = today_start.replace(hour=settings.end_hour)
+            for i, video in enumerate(to_schedule):
+                slot_offset = int(interval_minutes * i)
+                variance = random.randint(-20, 20)
+                post_time = window_start + timedelta(minutes=slot_offset + variance)
                 post_time = max(window_start, min(post_time, window_end - timedelta(minutes=1)))
                 video.scheduled_at = post_time
                 video.status = "scheduled"
@@ -99,6 +89,27 @@ def schedule_daily_posts():
         db.commit()
     finally:
         db.close()
+
+
+def _collect_slots(sources, today_start, today_end, db):
+    """Pick pending/ready videos for each source up to its videos_per_day quota."""
+    to_schedule = []
+    for source in sources:
+        already = db.query(QueuedVideo).filter(
+            QueuedVideo.source_id == source.id,
+            QueuedVideo.status == "scheduled",
+            QueuedVideo.scheduled_at >= today_start,
+            QueuedVideo.scheduled_at < today_end,
+        ).count()
+        slots = max(0, source.videos_per_day - already)
+        if slots == 0:
+            continue
+        pending = db.query(QueuedVideo).filter(
+            QueuedVideo.source_id == source.id,
+            QueuedVideo.status.in_(["pending", "ready"]),
+        ).order_by(QueuedVideo.created_at.asc()).limit(slots).all()
+        to_schedule.extend(pending)
+    return to_schedule
 
 
 def check_and_post_scheduled():
@@ -161,7 +172,7 @@ def _run_discovery_for_user(user_id: str, db):
 
 def _maybe_schedule_today():
     """
-    Called on startup. If no videos are scheduled for today yet, run schedule_daily_posts now.
+    Called on startup. If any source has unfilled slots for today, run schedule_daily_posts.
     Covers the case where the server was down at midnight and missed the cron.
     """
     db = SessionLocal()
@@ -176,13 +187,11 @@ def _maybe_schedule_today():
 
         needs_scheduling = False
         for settings in settings_list:
-            already_scheduled = db.query(QueuedVideo).filter(
-                QueuedVideo.user_id == settings.user_id,
-                QueuedVideo.status == "scheduled",
-                QueuedVideo.scheduled_at >= today_start,
-                QueuedVideo.scheduled_at < today_end,
-            ).count()
-            if already_scheduled < settings.posts_per_day:
+            active_sources = db.query(Source).filter(
+                Source.user_id == settings.user_id,
+                Source.is_active == True,
+            ).all()
+            if _collect_slots(active_sources, today_start, today_end, db):
                 needs_scheduling = True
                 break
 

@@ -57,9 +57,11 @@ export default function Autopilot() {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
 
+  const [sourcesPerDay, setSourcesPerDay] = useState(0);
+  const [activeSourcesCount, setActiveSourcesCount] = useState(0);
+
   const [form, setForm] = useState({
     enabled: false,
-    posts_per_day: 5,
     start_hour: 8,
     end_hour: 22,
     duration_type: "days",
@@ -75,10 +77,11 @@ export default function Autopilot() {
       const res = await api.get("/autopilot");
       const data = res.data;
       setSettings(data);
+      setSourcesPerDay(data.posts_per_day_from_sources ?? 0);
+      setActiveSourcesCount(data.active_sources_count ?? 0);
       setForm(f => ({
         ...f,
         enabled: data.enabled,
-        posts_per_day: data.posts_per_day,
         start_hour: data.start_hour,
         end_hour: data.end_hour,
       }));
@@ -103,7 +106,6 @@ export default function Autopilot() {
     setSaving(true);
     const payload = {
       enabled: enabledOverride !== undefined ? enabledOverride : form.enabled,
-      posts_per_day: form.posts_per_day,
       start_hour: form.start_hour,
       end_hour: form.end_hour,
     };
@@ -167,7 +169,7 @@ export default function Autopilot() {
             </div>
             <div style={{ fontSize: "13px", color: C.MUTED, marginTop: "4px" }}>
               {isOn
-                ? `Posting ${form.posts_per_day} videos/day between ${formatHour(form.start_hour)} – ${formatHour(form.end_hour)}`
+                ? `Posting ${sourcesPerDay} video${sourcesPerDay !== 1 ? "s" : ""}/day between ${formatHour(form.start_hour)} – ${formatHour(form.end_hour)}`
                 : "Enable to start automatically posting videos every day"}
             </div>
           </div>
@@ -194,7 +196,7 @@ export default function Autopilot() {
           <StatCard
             label="Posted Today"
             value={settings.posted_today ?? 0}
-            sub={`of ${form.posts_per_day} scheduled`}
+            sub={`of ${sourcesPerDay} today's target`}
             color={C.SUCCESS}
           />
           <StatCard
@@ -222,12 +224,33 @@ export default function Autopilot() {
       <div style={{ background: C.CARD, borderRadius: "12px", padding: "24px", border: "1px solid #1E1E35" }}>
         <h2 style={{ fontSize: "16px", fontWeight: 600, marginBottom: "20px" }}>Schedule Settings</h2>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "20px", marginBottom: "20px" }}>
+        {/* Source-driven post count */}
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          background: "#00D4FF11", border: "1px solid #00D4FF33",
+          borderRadius: "10px", padding: "14px 18px", marginBottom: "20px",
+        }}>
           <div>
-            <label style={label}>Posts Per Day</label>
-            <input name="posts_per_day" type="number" min="1" max="20" value={form.posts_per_day} onChange={handleChange} style={input} />
-            <div style={{ fontSize: "11px", color: C.MUTED, marginTop: "4px" }}>Max 20 per day</div>
+            <div style={{ fontSize: "13px", color: C.TEXT, fontWeight: 600 }}>
+              {sourcesPerDay > 0
+                ? `${sourcesPerDay} post${sourcesPerDay !== 1 ? "s" : ""}/day across ${activeSourcesCount} active source${activeSourcesCount !== 1 ? "s" : ""}`
+                : "No active sources configured"}
+            </div>
+            <div style={{ fontSize: "12px", color: C.MUTED, marginTop: "2px" }}>
+              Set per-source post counts in Sources → edit a source
+            </div>
           </div>
+          <a href="/sources" style={{
+            background: C.PRIMARY, color: "#0B0B18",
+            borderRadius: "7px", padding: "7px 16px",
+            fontSize: "12px", fontWeight: 700,
+            textDecoration: "none", whiteSpace: "nowrap",
+          }}>
+            Manage Sources
+          </a>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "20px" }}>
           <div>
             <label style={label}>Start Posting From</label>
             <select name="start_hour" value={form.start_hour} onChange={handleChange} style={input}>

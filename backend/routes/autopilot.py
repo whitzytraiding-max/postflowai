@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime, timedelta
 from database import get_db
-from models import AutopilotSettings, QueuedVideo, PostHistory, User
+from models import AutopilotSettings, QueuedVideo, PostHistory, Source, User
 from services.auth import get_current_user
 
 router = APIRouter(prefix="/autopilot", tags=["autopilot"])
@@ -12,7 +12,6 @@ router = APIRouter(prefix="/autopilot", tags=["autopilot"])
 
 class SaveAutopilotBody(BaseModel):
     enabled: bool
-    posts_per_day: Optional[int] = 5
     start_hour: Optional[int] = 8
     end_hour: Optional[int] = 22
     days: Optional[int] = None
@@ -22,8 +21,23 @@ class SaveAutopilotBody(BaseModel):
 @router.get("")
 def get_autopilot(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     settings = db.query(AutopilotSettings).filter(AutopilotSettings.user_id == current_user.id).first()
+
+    active_sources = db.query(Source).filter(
+        Source.user_id == current_user.id,
+        Source.is_active == True,
+    ).all()
+    posts_per_day_from_sources = sum(s.videos_per_day for s in active_sources)
+    active_sources_count = len(active_sources)
+
     if not settings:
-        return {"enabled": False, "posts_per_day": 5, "start_hour": 8, "end_hour": 22, "end_date": None}
+        return {
+            "enabled": False,
+            "start_hour": 8,
+            "end_hour": 22,
+            "end_date": None,
+            "posts_per_day_from_sources": posts_per_day_from_sources,
+            "active_sources_count": active_sources_count,
+        }
 
     now = datetime.utcnow()
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -56,10 +70,11 @@ def get_autopilot(current_user: User = Depends(get_current_user), db: Session = 
 
     return {
         "enabled": settings.enabled,
-        "posts_per_day": settings.posts_per_day,
         "start_hour": settings.start_hour,
         "end_hour": settings.end_hour,
         "end_date": settings.end_date.isoformat() if settings.end_date else None,
+        "posts_per_day_from_sources": posts_per_day_from_sources,
+        "active_sources_count": active_sources_count,
         "posted_today": posted_today,
         "scheduled_today": len(scheduled_today),
         "next_post_at": next_post,
@@ -79,7 +94,6 @@ def save_autopilot(body: SaveAutopilotBody, current_user: User = Depends(get_cur
 
     if settings:
         settings.enabled = body.enabled
-        settings.posts_per_day = body.posts_per_day or 5
         settings.start_hour = body.start_hour if body.start_hour is not None else 8
         settings.end_hour = body.end_hour if body.end_hour is not None else 22
         settings.end_date = end_date
@@ -88,7 +102,6 @@ def save_autopilot(body: SaveAutopilotBody, current_user: User = Depends(get_cur
         settings = AutopilotSettings(
             user_id=current_user.id,
             enabled=body.enabled,
-            posts_per_day=body.posts_per_day or 5,
             start_hour=body.start_hour if body.start_hour is not None else 8,
             end_hour=body.end_hour if body.end_hour is not None else 22,
             end_date=end_date,
