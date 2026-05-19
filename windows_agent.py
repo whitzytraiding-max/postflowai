@@ -18,6 +18,11 @@ RENDER_URL = "https://postflow-ai-backend.onrender.com"
 API_KEY    = "YOUR_API_KEY_HERE"   # get this from the PostFlow dashboard
 HEADERS    = {"X-API-Key": API_KEY}
 POLL_EVERY = 60   # seconds between polls
+
+# Browser to read YouTube cookies from (fixes 467 bot-detection errors).
+# yt-dlp reads cookies directly from the installed browser — no export needed.
+# Change to "firefox" or "edge" if you don't use Chrome.
+BROWSER = "chrome"
 # ────────────────────────────────────────────────────────────────────────────
 
 
@@ -33,24 +38,39 @@ def fetch_pending():
 
 def download_video(url: str, video_id: str, tmpdir: str) -> str | None:
     out_path = os.path.join(tmpdir, f"{video_id}.%(ext)s")
-    opts = {
+    base_opts = {
         "outtmpl": out_path,
-        "format": "bestvideo[height>=1080][ext=mp4]+bestaudio[ext=m4a]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best",
+        "format": "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
         "merge_output_format": "mp4",
         "quiet": False,
         "no_warnings": True,
     }
-    try:
-        with yt_dlp.YoutubeDL(opts) as ydl:
-            ydl.extract_info(url, download=True)
-        matches = glob.glob(os.path.join(tmpdir, f"{video_id}.*"))
-        if matches and os.path.getsize(matches[0]) > 0:
-            return matches[0]
-        print(f"[Agent] Download produced no file for {video_id}")
-        return None
-    except Exception as e:
-        print(f"[Agent] Download error: {e}")
-        return None
+
+    # Try with browser cookies first (bypasses YouTube 467 bot detection),
+    # then fall back to no cookies.
+    attempts = [
+        {**base_opts, "cookiesfrombrowser": (BROWSER,)},
+        base_opts,
+    ]
+
+    for i, opts in enumerate(attempts):
+        # Clean up any partial files from a previous attempt
+        for f in glob.glob(os.path.join(tmpdir, f"{video_id}.*")):
+            os.remove(f)
+        label = f"{BROWSER} cookies" if i == 0 else "no cookies"
+        try:
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                ydl.extract_info(url, download=True)
+            matches = glob.glob(os.path.join(tmpdir, f"{video_id}.*"))
+            if matches and os.path.getsize(matches[0]) > 0:
+                print(f"[Agent] Downloaded OK ({label}): {matches[0]}")
+                return matches[0]
+        except Exception as e:
+            print(f"[Agent] Download failed ({label}): {e}")
+            continue
+
+    print(f"[Agent] All download attempts failed for {video_id}")
+    return None
 
 
 def deliver(video_id: str, local_path: str) -> bool:
@@ -78,6 +98,7 @@ def deliver(video_id: str, local_path: str) -> bool:
 
 def main():
     print(f"[Agent] PostFlow Windows agent started. Polling every {POLL_EVERY}s...")
+    print(f"[Agent] Using {BROWSER} cookies for YouTube downloads.")
     while True:
         videos = fetch_pending()
         if videos:
@@ -88,7 +109,6 @@ def main():
                     path = download_video(v["original_url"], v["id"], tmpdir)
                     if path:
                         deliver(v["id"], path)
-                    # tmpdir (and file) cleaned up automatically
         else:
             print(f"[Agent] Nothing pending. Next check in {POLL_EVERY}s...")
 
