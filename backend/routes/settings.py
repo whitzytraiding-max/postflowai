@@ -19,6 +19,7 @@ class SaveKeysBody(BaseModel):
 class ConnectInstagramBody(BaseModel):
     session_id: str
     account_name: str
+    proxy_url: Optional[str] = None
 
 
 class ConnectYouTubeBody(BaseModel):
@@ -27,6 +28,7 @@ class ConnectYouTubeBody(BaseModel):
     client_secret: str
     refresh_token: str
     access_token: Optional[str] = ""
+    proxy_url: Optional[str] = None
 
 
 @router.get("/keys")
@@ -78,7 +80,7 @@ def get_accounts(current_user: User = Depends(get_current_user), db: Session = D
 
 @router.post("/connect/instagram")
 def connect_instagram(body: ConnectInstagramBody, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    creds = json.dumps({"session_id": body.session_id})
+    creds = json.dumps({"session_id": body.session_id, "proxy_url": body.proxy_url or ""})
     account = ConnectedAccount(
         user_id=current_user.id,
         platform="instagram",
@@ -98,6 +100,7 @@ def connect_youtube(body: ConnectYouTubeBody, current_user: User = Depends(get_c
         "client_secret": body.client_secret,
         "refresh_token": body.refresh_token,
         "access_token": body.access_token,
+        "proxy_url": body.proxy_url or "",
     })
     account = ConnectedAccount(
         user_id=current_user.id,

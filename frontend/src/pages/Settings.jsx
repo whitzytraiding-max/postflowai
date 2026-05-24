@@ -153,6 +153,7 @@ export default function Settings() {
   // Instagram state
   const [igSessionId, setIgSessionId] = useState("");
   const [igAccountName, setIgAccountName] = useState("");
+  const [igProxy, setIgProxy] = useState("");
   const [connectingIg, setConnectingIg] = useState(false);
 
   // YouTube state
@@ -160,6 +161,7 @@ export default function Settings() {
   const [ytClientSecret, setYtClientSecret] = useState("");
   const [ytRefreshToken, setYtRefreshToken] = useState("");
   const [ytAccountName, setYtAccountName] = useState("");
+  const [ytProxy, setYtProxy] = useState("");
   const [connectingYt, setConnectingYt] = useState(false);
 
   // Connected accounts
@@ -223,10 +225,12 @@ export default function Settings() {
       await connectInstagram({
         session_id: igSessionId,
         account_name: igAccountName,
+        proxy_url: igProxy.trim() || undefined,
       });
       showToast("Instagram connected");
       setIgSessionId("");
       setIgAccountName("");
+      setIgProxy("");
       await loadAll();
     } catch {
       showToast("Failed to connect Instagram", "error");
@@ -248,12 +252,14 @@ export default function Settings() {
         client_secret: ytClientSecret,
         refresh_token: ytRefreshToken,
         access_token: "",
+        proxy_url: ytProxy.trim() || undefined,
       });
       showToast("YouTube connected");
       setYtClientId("");
       setYtClientSecret("");
       setYtRefreshToken("");
       setYtAccountName("");
+      setYtProxy("");
       await loadAll();
     } catch {
       showToast("Failed to connect YouTube", "error");
@@ -358,6 +364,13 @@ export default function Settings() {
           onChange={setIgAccountName}
           placeholder="e.g. @myaccount"
         />
+        <InputField
+          label="Residential Proxy (optional)"
+          value={igProxy}
+          onChange={setIgProxy}
+          placeholder="http://user:pass@host:port"
+          helpText="Assign a unique residential proxy to this account so it posts from a dedicated IP. Get from IPRoyal or Proxy-Cheap. Format: http://user:pass@host:port"
+        />
         <SaveButton onClick={handleConnectInstagram} loading={connectingIg} label="Connect Instagram" />
       </SectionCard>
 
@@ -413,6 +426,13 @@ export default function Settings() {
           onChange={setYtAccountName}
           placeholder="e.g. My YouTube Channel"
         />
+        <InputField
+          label="Residential Proxy (optional)"
+          value={ytProxy}
+          onChange={setYtProxy}
+          placeholder="http://user:pass@host:port"
+          helpText="Assign a unique residential proxy to this account. Format: http://user:pass@host:port"
+        />
         <SaveButton onClick={handleConnectYouTube} loading={connectingYt} label="Connect YouTube" />
       </SectionCard>
 
@@ -467,6 +487,20 @@ export default function Settings() {
                     }}
                   >
                     {acc.platform}
+                    {(() => {
+                      try {
+                        const c = JSON.parse(acc.credentials_json || "{}");
+                        return c.proxy_url ? (
+                          <span style={{ color: COLORS.SUCCESS, marginLeft: "8px", textTransform: "none" }}>
+                            Proxy set
+                          </span>
+                        ) : (
+                          <span style={{ color: COLORS.ERROR, marginLeft: "8px", textTransform: "none" }}>
+                            No proxy
+                          </span>
+                        );
+                      } catch { return null; }
+                    })()}
                   </div>
                 </div>
                 <span

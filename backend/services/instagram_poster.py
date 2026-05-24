@@ -137,8 +137,11 @@ def post_to_instagram(local_path: str, caption: str, credentials_json: str) -> s
         raise ValueError("No Instagram session_id in credentials")
 
     device = _device_for_session(session_id)
+    proxy_url = creds.get("proxy_url", "")
 
     cl = Client()
+    if proxy_url:
+        cl.set_proxy(proxy_url)
     cl.set_device(device)
     cl.set_user_agent(
         f"Instagram {device['app_version']} Android ({device['android_version']}/"

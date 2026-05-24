@@ -1,9 +1,27 @@
 import os
 import json
+from urllib.parse import urlparse
+import httplib2
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
+
+
+def _build_youtube_client(creds, proxy_url: str):
+    if not proxy_url:
+        return build("youtube", "v3", credentials=creds)
+    parsed = urlparse(proxy_url)
+    proxy_info = httplib2.ProxyInfo(
+        proxy_type=httplib2.socks.PROXY_TYPE_HTTP,
+        proxy_host=parsed.hostname,
+        proxy_port=parsed.port or 80,
+        proxy_rdns=True,
+        proxy_user=parsed.username or None,
+        proxy_pass=parsed.password or None,
+    )
+    http = creds.authorize(httplib2.Http(proxy_info=proxy_info))
+    return build("youtube", "v3", http=http)
 
 
 def post_to_youtube(local_path: str, title: str, caption: str, credentials_json: str) -> str:
@@ -22,7 +40,7 @@ def post_to_youtube(local_path: str, title: str, caption: str, credentials_json:
     if creds.expired and creds.refresh_token:
         creds.refresh(Request())
 
-    youtube = build("youtube", "v3", credentials=creds)
+    youtube = _build_youtube_client(creds, creds_data.get("proxy_url", ""))
 
     body = {
         "snippet": {
