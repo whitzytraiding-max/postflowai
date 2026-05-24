@@ -7,6 +7,7 @@ import random
 import hashlib
 import imageio_ffmpeg
 from instagrapi import Client
+from services.exceptions import BannedAccountError
 
 FFMPEG = imageio_ffmpeg.get_ffmpeg_exe()
 
@@ -149,13 +150,25 @@ def post_to_instagram(local_path: str, caption: str, credentials_json: str) -> s
         f"{device['manufacturer']}; {device['device']}; {device['cpu']}; en_US; "
         f"{device['version_code']})"
     )
-    cl.login_by_sessionid(session_id)
+    try:
+        cl.login_by_sessionid(session_id)
+    except Exception as e:
+        err = str(e).lower()
+        if any(k in err for k in ("loginrequired", "login_required", "challenge", "checkpoint", "not found", "banned", "suspended", "disabled")):
+            raise BannedAccountError("instagram", f"Login failed: {e}")
+        raise
 
     _warmup(cl)
 
     encoded_path = _encode_for_instagram(local_path)
     try:
-        media = cl.clip_upload(encoded_path, caption=caption)
+        try:
+            media = cl.clip_upload(encoded_path, caption=caption)
+        except Exception as e:
+            err = str(e).lower()
+            if any(k in err for k in ("loginrequired", "login_required", "challenge", "checkpoint", "feedback_required", "banned", "suspended", "disabled", "not found")):
+                raise BannedAccountError("instagram", f"Post blocked: {e}")
+            raise
     finally:
         os.unlink(encoded_path)
 

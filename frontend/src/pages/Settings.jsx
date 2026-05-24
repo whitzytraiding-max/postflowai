@@ -505,15 +505,17 @@ export default function Settings() {
                 </div>
                 <span
                   style={{
-                    background: acc.is_active ? COLORS.SUCCESS + "22" : "#ffffff11",
-                    color: acc.is_active ? COLORS.SUCCESS : COLORS.MUTED,
+                    background: acc.is_active ? COLORS.SUCCESS + "22" : COLORS.ERROR + "22",
+                    color: acc.is_active ? COLORS.SUCCESS : COLORS.ERROR,
                     padding: "3px 10px",
                     borderRadius: "20px",
                     fontSize: "11px",
                     fontWeight: 700,
+                    cursor: acc.ban_reason ? "help" : "default",
                   }}
+                  title={acc.ban_reason || undefined}
                 >
-                  {acc.is_active ? "Active" : "Inactive"}
+                  {acc.is_active ? "Active" : acc.ban_reason ? "Banned" : "Inactive"}
                 </span>
                 <button
                   onClick={() => handleDisconnect(acc.id)}

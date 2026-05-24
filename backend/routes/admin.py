@@ -47,8 +47,11 @@ def list_proxies(admin: User = Depends(require_admin), db: Session = Depends(get
 @router.get("/proxies/stats")
 def proxy_stats(admin: User = Depends(require_admin), db: Session = Depends(get_db)):
     total = db.query(ProxyPool).count()
-    assigned = db.query(ProxyPool).filter(ProxyPool.assigned_account_id.isnot(None)).count()
-    return {"total": total, "assigned": assigned, "available": total - assigned}
+    banned = db.query(ProxyPool).filter(ProxyPool.is_active == False).count()
+    active = db.query(ProxyPool).filter(ProxyPool.is_active == True)
+    assigned = active.filter(ProxyPool.assigned_account_id.isnot(None)).count()
+    available = active.filter(ProxyPool.assigned_account_id.is_(None)).count()
+    return {"total": total, "assigned": assigned, "available": available, "banned": banned}
 
 
 @router.post("/proxies/bulk")

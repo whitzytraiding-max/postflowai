@@ -45,7 +45,7 @@ function maskProxy(url) {
 }
 
 export default function Admin() {
-  const [stats, setStats] = useState({ total: 0, assigned: 0, available: 0 });
+  const [stats, setStats] = useState({ total: 0, assigned: 0, available: 0, banned: 0 });
   const [proxies, setProxies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [bulkText, setBulkText] = useState("");
@@ -124,6 +124,7 @@ export default function Admin() {
         <StatCard label="Total Proxies" value={stats.total} color={C.TEXT} />
         <StatCard label="Assigned" value={stats.assigned} color={C.SECONDARY} />
         <StatCard label="Available" value={stats.available} color={C.SUCCESS} />
+        <StatCard label="Banned IPs" value={stats.banned} color={C.ERROR} />
       </div>
 
       {/* Add proxies */}
@@ -218,24 +219,34 @@ export default function Admin() {
                   display: "grid", gridTemplateColumns: "2fr 1.5fr 1fr auto",
                   gap: "12px", alignItems: "center",
                   padding: "12px", background: C.BG,
-                  borderRadius: "8px", border: `1px solid ${C.BORDER}`,
+                  borderRadius: "8px",
+                  border: `1px solid ${!p.is_active ? C.ERROR : C.BORDER}`,
+                  opacity: p.is_active ? 1 : 0.7,
                 }}
               >
-                <span style={{ fontSize: "12px", fontFamily: "monospace", color: C.TEXT }}>
+                <span style={{ fontSize: "12px", fontFamily: "monospace", color: p.is_active ? C.TEXT : C.MUTED }}>
                   {maskProxy(p.proxy_url)}
+                  {!p.is_active && (
+                    <span style={{
+                      marginLeft: "8px", background: C.ERROR + "22", color: C.ERROR,
+                      padding: "2px 7px", borderRadius: "20px", fontSize: "10px", fontWeight: 700,
+                    }}>
+                      BANNED IP
+                    </span>
+                  )}
                 </span>
                 <span style={{ fontSize: "13px" }}>
-                  {p.assigned_account_name ? (
-                    <span style={{ color: C.SECONDARY, fontWeight: 600 }}>
-                      {p.assigned_account_name}
-                    </span>
+                  {!p.is_active ? (
+                    <span style={{ color: C.ERROR, fontWeight: 600 }}>Blacklisted</span>
+                  ) : p.assigned_account_name ? (
+                    <span style={{ color: C.SECONDARY, fontWeight: 600 }}>{p.assigned_account_name}</span>
                   ) : (
                     <span style={{ color: C.SUCCESS }}>Available</span>
                   )}
                 </span>
                 <span style={{ fontSize: "12px", color: C.MUTED }}>{p.label || "—"}</span>
                 <div style={{ display: "flex", gap: "6px" }}>
-                  {p.assigned_account_id && (
+                  {p.is_active && p.assigned_account_id && (
                     <button
                       onClick={() => handleRelease(p.id)}
                       style={{

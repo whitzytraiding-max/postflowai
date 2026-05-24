@@ -3,9 +3,10 @@ import time
 import random
 from datetime import datetime
 from sqlalchemy.orm import Session
-from models import QueuedVideo, ConnectedAccount, PostHistory
+from models import QueuedVideo, ConnectedAccount, PostHistory, ProxyPool
 from services.downloader import download_video
 from services.caption import generate_caption
+from services.exceptions import BannedAccountError
 
 
 def run_pipeline(video_id: str, db: Session, user_id: str) -> dict:
@@ -122,6 +123,28 @@ def run_pipeline(video_id: str, db: Session, user_id: str) -> dict:
             )
             db.add(history)
             results.append({"platform": target, "success": True, "post_url": post_url})
+
+        except BannedAccountError as e:
+            print(f"[Pipeline] BAN DETECTED on {target} account '{account.account_name}': {e.reason}")
+            account.is_active = False
+            account.ban_reason = e.reason
+            # Blacklist the proxy so it's never reused
+            proxy = db.query(ProxyPool).filter(ProxyPool.assigned_account_id == account.id).first()
+            if proxy:
+                proxy.is_active = False
+                proxy.assigned_account_id = None
+            db.commit()
+            history = PostHistory(
+                user_id=user_id,
+                queued_video_id=video.id,
+                platform=target,
+                post_url=None,
+                posted_at=datetime.utcnow(),
+                caption=video.ai_caption or "",
+                status="failed",
+            )
+            db.add(history)
+            results.append({"platform": target, "success": False, "error": f"Account banned: {e.reason}"})
 
         except Exception as e:
             history = PostHistory(

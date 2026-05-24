@@ -69,6 +69,7 @@ def _run_migrations():
         "ALTER TABLE sources ADD COLUMN IF NOT EXISTS instagram_account_id VARCHAR",
         "ALTER TABLE sources ADD COLUMN IF NOT EXISTS youtube_account_id VARCHAR",
         "ALTER TABLE sources ADD COLUMN IF NOT EXISTS language VARCHAR DEFAULT 'any'",
+        "ALTER TABLE connected_accounts ADD COLUMN IF NOT EXISTS ban_reason TEXT",
     ]
     with engine.connect() as conn:
         for sql in migrations:

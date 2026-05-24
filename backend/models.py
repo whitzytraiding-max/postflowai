@@ -76,6 +76,7 @@ class ConnectedAccount(Base):
     account_name = Column(String, nullable=False)
     credentials_json = Column(Text, nullable=False)    # encrypted JSON blob
     is_active = Column(Boolean, default=True)
+    ban_reason = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 

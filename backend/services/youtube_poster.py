@@ -3,9 +3,11 @@ import json
 from urllib.parse import urlparse
 import httplib2
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaFileUpload
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
+from services.exceptions import BannedAccountError
 
 
 def _build_youtube_client(creds, proxy_url: str):
@@ -58,6 +60,12 @@ def post_to_youtube(local_path: str, title: str, caption: str, credentials_json:
     media = MediaFileUpload(local_path, mimetype="video/mp4", resumable=True)
 
     request = youtube.videos().insert(part="snippet,status", body=body, media_body=media)
-    response = request.execute()
+    try:
+        response = request.execute()
+    except HttpError as e:
+        content = e.content.decode("utf-8", errors="ignore").lower() if e.content else ""
+        if e.status_code in (401, 403) and any(k in content for k in ("suspended", "disabled", "terminated", "forbidden", "caller does not have permission")):
+            raise BannedAccountError("youtube", f"Account suspended or revoked (HTTP {e.status_code}): {content[:200]}")
+        raise
     video_id = response["id"]
     return f"https://www.youtube.com/shorts/{video_id}"
