@@ -5,8 +5,30 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional
 from database import get_db
-from models import ConnectedAccount, User
+from models import ConnectedAccount, ProxyPool, User
 from services.auth import get_current_user
+
+
+def _auto_assign_proxy(db: Session, account: ConnectedAccount):
+    """Pick an unassigned proxy from the pool and wire it to this account."""
+    proxy = (
+        db.query(ProxyPool)
+        .filter(ProxyPool.assigned_account_id.is_(None), ProxyPool.is_active == True)
+        .first()
+    )
+    if not proxy:
+        return
+    creds = json.loads(account.credentials_json)
+    creds["proxy_url"] = proxy.proxy_url
+    account.credentials_json = json.dumps(creds)
+    proxy.assigned_account_id = account.id
+
+
+def _release_proxy(db: Session, account_id: str):
+    """Return the proxy assigned to this account back to the pool."""
+    proxy = db.query(ProxyPool).filter(ProxyPool.assigned_account_id == account_id).first()
+    if proxy:
+        proxy.assigned_account_id = None
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -89,6 +111,9 @@ def connect_instagram(body: ConnectInstagramBody, current_user: User = Depends(g
         is_active=True,
     )
     db.add(account)
+    db.flush()  # get account.id before commit
+    if not body.proxy_url:
+        _auto_assign_proxy(db, account)
     db.commit()
     return {"ok": True}
 
@@ -110,6 +135,9 @@ def connect_youtube(body: ConnectYouTubeBody, current_user: User = Depends(get_c
         is_active=True,
     )
     db.add(account)
+    db.flush()
+    if not body.proxy_url:
+        _auto_assign_proxy(db, account)
     db.commit()
     return {"ok": True}
 
@@ -121,6 +149,7 @@ def disconnect_account(account_id: str, current_user: User = Depends(get_current
         ConnectedAccount.user_id == current_user.id,
     ).first()
     if account:
+        _release_proxy(db, account.id)
         db.delete(account)
         db.commit()
     return {"ok": True}

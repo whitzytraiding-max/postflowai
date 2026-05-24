@@ -79,6 +79,17 @@ class ConnectedAccount(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class ProxyPool(Base):
+    __tablename__ = "proxy_pool"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    proxy_url = Column(String, nullable=False, unique=True)
+    label = Column(String, nullable=True)
+    assigned_account_id = Column(String, nullable=True)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 class AutopilotSettings(Base):
     __tablename__ = "autopilot_settings"
 

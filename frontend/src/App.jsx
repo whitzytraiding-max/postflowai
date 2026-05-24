@@ -8,6 +8,7 @@ import Queue from "./pages/Queue";
 import History from "./pages/History";
 import Settings from "./pages/Settings";
 import Autopilot from "./pages/Autopilot";
+import Admin from "./pages/Admin";
 
 function AppRoutes() {
   const { user, loading } = useAuth();
@@ -31,6 +32,9 @@ function AppRoutes() {
         <Route path="/autopilot" element={<Layout><Autopilot /></Layout>} />
         <Route path="/history" element={<Layout><History /></Layout>} />
         <Route path="/settings" element={<Layout><Settings /></Layout>} />
+        {user?.is_admin && (
+          <Route path="/admin" element={<Layout><Admin /></Layout>} />
+        )}
       </Routes>
     </BrowserRouter>
   );

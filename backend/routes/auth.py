@@ -38,7 +38,9 @@ def login(body: AuthBody, db: Session = Depends(get_db)):
 
 @router.get("/me")
 def me(current_user: User = Depends(get_current_user)):
-    return {"user_id": current_user.id, "email": current_user.email, "api_key": current_user.api_key}
+    admin_email = os.getenv("ADMIN_EMAIL", "").lower()
+    is_admin = bool(admin_email and current_user.email.lower() == admin_email)
+    return {"user_id": current_user.id, "email": current_user.email, "api_key": current_user.api_key, "is_admin": is_admin}
 
 
 @router.post("/setup")

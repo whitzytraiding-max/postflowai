@@ -59,4 +59,11 @@ export const authLogin = (data) => api.post("/auth/login", data).then((r) => r.d
 export const authRegister = (data) => api.post("/auth/register", data).then((r) => r.data);
 export const authMe = () => api.get("/auth/me").then((r) => r.data);
 
+// Admin — proxy pool
+export const getProxies = () => api.get("/admin/proxies").then((r) => r.data);
+export const getProxyStats = () => api.get("/admin/proxies/stats").then((r) => r.data);
+export const bulkAddProxies = (data) => api.post("/admin/proxies/bulk", data).then((r) => r.data);
+export const deleteProxy = (id) => api.delete(`/admin/proxies/${id}`).then((r) => r.data);
+export const releaseProxy = (id) => api.post(`/admin/proxies/${id}/release`).then((r) => r.data);
+
 export default api;

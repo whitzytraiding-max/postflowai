@@ -12,7 +12,7 @@ export function AuthProvider({ children }) {
     if (!token) { setLoading(false); return; }
     api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
     api.get("/auth/me")
-      .then((r) => setUser(r.data))
+      .then((r) => setUser({ ...r.data, is_admin: r.data.is_admin || false }))
       .catch(() => { localStorage.removeItem("pf_token"); })
       .finally(() => setLoading(false));
   }, []);
@@ -20,7 +20,7 @@ export function AuthProvider({ children }) {
   function login(data) {
     localStorage.setItem("pf_token", data.token);
     api.defaults.headers.common["Authorization"] = `Bearer ${data.token}`;
-    setUser({ user_id: data.user_id, email: data.email, api_key: data.api_key });
+    setUser({ user_id: data.user_id, email: data.email, api_key: data.api_key, is_admin: data.is_admin || false });
   }
 
   function logout() {

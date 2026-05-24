@@ -5,7 +5,7 @@ from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from database import engine, Base, get_db
-from routes import sources, queue, discovery, accounts, pipeline, settings, autopilot
+from routes import sources, queue, discovery, accounts, pipeline, settings, autopilot, admin
 from routes.auth import router as auth_router
 from services.auth import get_current_user
 from services.scheduler import start_scheduler
@@ -52,6 +52,7 @@ app.include_router(accounts.router)
 app.include_router(pipeline.router)
 app.include_router(settings.router)
 app.include_router(autopilot.router)
+app.include_router(admin.router)
 
 
 @app.on_event("startup")

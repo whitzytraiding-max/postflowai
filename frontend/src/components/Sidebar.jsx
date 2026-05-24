@@ -1,4 +1,5 @@
 import { NavLink } from "react-router-dom";
+import { useAuth } from "../lib/AuthContext";
 
 const NAV_ITEMS = [
   { to: "/", icon: "📊", label: "Dashboard" },
@@ -38,6 +39,7 @@ const styles = {
 };
 
 export default function Sidebar() {
+  const { user } = useAuth();
   return (
     <aside style={styles.sidebar}>
       <div style={styles.logo}>
@@ -50,7 +52,7 @@ export default function Sidebar() {
         </div>
       </div>
       <nav style={styles.nav}>
-        {NAV_ITEMS.map(({ to, icon, label }) => (
+        {[...NAV_ITEMS, ...(user?.is_admin ? [{ to: "/admin", icon: "🔧", label: "Proxy Pool" }] : [])].map(({ to, icon, label }) => (
           <NavLink
             key={to}
             to={to}
